@@ -1,0 +1,280 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-cormorant: 'Cormorant Garamond', Georgia, serif;
+  --font-inter: 'Inter', system-ui, sans-serif;
+
+  /* Brand colors */
+  --color-obsidian: #08080C;
+  --color-gold: #C9A96E;
+  --color-gold-light: #E8C98A;
+  --color-cream: #F8F4EE;
+  --color-surface: #111117;
+  --color-surface-card: #16161E;
+  --color-surface-border: #242430;
+  --color-text-secondary: #8A8490;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--color-obsidian);
+  color: var(--color-cream);
+  font-family: var(--font-inter);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ─── Typography ─────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-cormorant);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-cormorant);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-obsidian);
+}
+::-webkit-scrollbar-thumb {
+  background: #2A2830;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold);
+}
+
+/* ─── Selection ──────────────────────────────────────────── */
+::selection {
+  background: rgba(201, 169, 110, 0.25);
+  color: var(--color-cream);
+}
+
+/* ─── Custom utilities ───────────────────────────────────── */
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #C9A96E 0%, #F0D898 50%, #C9A96E 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-cream {
+    background: linear-gradient(180deg, #F8F4EE 0%, #C8BFB0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gold-border {
+    border: 1px solid rgba(201, 169, 110, 0.25);
+  }
+
+  .glass-card {
+    background: rgba(22, 22, 30, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .gold-divider {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #C9A96E, transparent);
+  }
+
+  .grain-overlay::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.025;
+    pointer-events: none;
+    z-index: 9999;
+    animation: grain 8s steps(10) infinite;
+  }
+
+  /* Gold shimmer button */
+  .btn-gold {
+    background: linear-gradient(135deg, #C9A96E 0%, #E8C98A 50%, #C9A96E 100%);
+    background-size: 200% 100%;
+    color: #08080C;
+    font-family: var(--font-inter);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 20px rgba(201,169,110,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-gold:hover {
+    background-position: 100% 0;
+    box-shadow: 0 8px 40px rgba(201,169,110,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
+    transform: translateY(-1px);
+  }
+
+  .btn-gold:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(201,169,110,0.2);
+  }
+
+  /* Outline button */
+  .btn-outline {
+    border: 1px solid rgba(201, 169, 110, 0.4);
+    color: var(--color-gold);
+    font-family: var(--font-inter);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: transparent;
+  }
+
+  .btn-outline:hover {
+    border-color: rgba(201, 169, 110, 0.8);
+    background: rgba(201, 169, 110, 0.06);
+    color: var(--color-gold-light);
+    transform: translateY(-1px);
+  }
+
+  /* Form input styling */
+  .form-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--color-cream);
+    transition: all 0.3s ease;
+    font-family: var(--font-inter);
+  }
+
+  .form-input:focus {
+    background: rgba(201, 169, 110, 0.05);
+    border-color: rgba(201, 169, 110, 0.5);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.08);
+  }
+
+  .form-input::placeholder {
+    color: rgba(138, 132, 144, 0.6);
+  }
+
+  /* Noise texture overlay */
+  .noise-bg {
+    position: relative;
+  }
+
+  .noise-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* Smooth section fade */
+  .section-reveal {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+/* ─── Keyframes ──────────────────────────────────────────── */
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2%, -3%); }
+  20% { transform: translate(3%, 2%); }
+  30% { transform: translate(-1%, 4%); }
+  40% { transform: translate(2%, -1%); }
+  50% { transform: translate(-3%, 2%); }
+  60% { transform: translate(1%, -4%); }
+  70% { transform: translate(3%, 3%); }
+  80% { transform: translate(-2%, 1%); }
+  90% { transform: translate(1%, -2%); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+/* ─── Focus visible ──────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid rgba(201, 169, 110, 0.6);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ─── Mobile-specific ────────────────────────────────────── */
+
+/* Touch tap highlight removal — prevents blue flash on iOS/Android */
+a, button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide scrollbar in carousels (testimonial carousel) */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Smooth momentum scrolling on iOS */
+.overflow-x-auto { -webkit-overflow-scrolling: touch; }
+
+/* Safe area padding utilities */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* Mobile select styling */
+select.form-input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23C9A96E' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+/* Critical: prevents iOS Safari zoom on input focus */
+input[type="text"],
+input[type="tel"],
+input[type="email"],
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* iOS min-height fix */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen { min-height: -webkit-fill-available; }
+}
