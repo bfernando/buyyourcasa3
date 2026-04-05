@@ -8,3 +8,7 @@ out/
 .DS_Store
 Thumbs.db
 .claude/
+
+.vercel
+
+/app/generated/prisma

@@ -172,6 +172,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
   const [direction, setDirection] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [leadId, setLeadId] = useState<string | null>(null); // DB record ID for progressive updates
   const [form, setForm] = useState<FormData>({
     address: prefillAddress,
     phone: "",
@@ -183,7 +184,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
     reason: "",
   });
 
-  // When parent passes a prefilled address, update form
+  // When hero passes a prefilled address, update form
   useEffect(() => {
     if (prefillAddress) {
       setForm((prev) => ({ ...prev, address: prefillAddress }));
@@ -195,6 +196,35 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
+  // ─── Progressive capture helpers ─────────────────────────────────────────
+  const createLead = async (address: string): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, source: "mobile" }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.id as string;
+    } catch {
+      return null;
+    }
+  };
+
+  const updateLead = async (id: string, patch: Record<string, unknown>) => {
+    try {
+      await fetch(`/api/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      // Silently fail — don't block UX for a DB write error
+    }
+  };
+
+  // ─── Validation ───────────────────────────────────────────────────────────
   const validate = (): boolean => {
     const e: Partial<Record<keyof FormData, string>> = {};
     if (step === 1 && !form.address.trim()) e.address = "Please enter your property address";
@@ -214,8 +244,36 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
     return Object.keys(e).length === 0;
   };
 
-  const next = () => {
+  const next = async () => {
     if (!validate()) return;
+
+    // Step 1 complete → create lead record immediately (address captured)
+    if (step === 1) {
+      const id = await createLead(form.address);
+      if (id) setLeadId(id);
+    }
+
+    // Steps 2–4 → progressively update the existing record
+    if (step === 2 && leadId) {
+      updateLead(leadId, { phone: form.phone, step: 2 });
+    }
+    if (step === 3 && leadId) {
+      updateLead(leadId, {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email || undefined,
+        step: 3,
+      });
+    }
+    if (step === 4 && leadId) {
+      updateLead(leadId, {
+        condition: form.condition,
+        timeline: form.timeline,
+        reason: form.reason || undefined,
+        step: 4,
+      });
+    }
+
     setDirection(1);
     setStep((s) => Math.min(s + 1, TOTAL_STEPS));
   };
@@ -225,9 +283,17 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
     setStep((s) => Math.max(s - 1, 1));
   };
 
-  const submit = () => {
-    // ─── Replace with your form submission (API route, webhook, CRM) ────
-    console.log("Mobile form submission:", form);
+  const submit = async () => {
+    if (leadId) {
+      await updateLead(leadId, {
+        completed: true,
+        step: 5,
+        // Catch anything not yet saved
+        condition: form.condition,
+        timeline: form.timeline,
+        reason: form.reason || undefined,
+      });
+    }
     setSubmitted(true);
   };
 

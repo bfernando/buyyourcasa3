@@ -208,10 +208,39 @@ export default function LeadForm() {
   const [formData, setFormData] = useState<FormData>(initialData);
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
 
   const update = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  // ─── Progressive capture helpers ──────────────────────────────────────────
+  const createLead = async (address: string): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, source: "desktop" }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.id as string;
+    } catch {
+      return null;
+    }
+  };
+
+  const updateLead = async (id: string, patch: Record<string, unknown>) => {
+    try {
+      await fetch(`/api/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      // Silently fail — don't block UX for a DB write error
+    }
   };
 
   // ─── Validation ────────────────────────────────────────────────────────
@@ -246,13 +275,39 @@ export default function LeadForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     if (!validateStep()) return;
-    if (step === 3) {
+
+    // Step 1 complete → create lead record immediately
+    if (step === 1) {
+      const id = await createLead(formData.address);
+      if (id) setLeadId(id);
+    }
+
+    // Step 2 complete → save contact info
+    if (step === 2 && leadId) {
+      updateLead(leadId, {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        email: formData.email,
+        step: 2,
+      });
+    }
+
+    // Step 3 complete → save property details
+    if (step === 3 && leadId) {
+      updateLead(leadId, {
+        condition: formData.condition,
+        timeline: formData.timeline,
+        reason: formData.reason || undefined,
+        step: 3,
+      });
       setStep(4);
       setDirection(1);
       return;
     }
+
     setDirection(1);
     setStep((s) => Math.min(s + 1, 4));
   };
@@ -262,10 +317,10 @@ export default function LeadForm() {
     setStep((s) => Math.max(s - 1, 1));
   };
 
-  const handleSubmit = () => {
-    // ─── Replace this with your actual form submission logic ────────────
-    // e.g., POST to /api/leads or a CRM webhook
-    console.log("Form submission:", formData);
+  const handleSubmit = async () => {
+    if (leadId) {
+      await updateLead(leadId, { completed: true, step: 4 });
+    }
     setSubmitted(true);
   };
 

@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Step 1 — captured immediately on first action
+  address   String
+  source    String   @default("desktop") // "desktop" | "mobile"
+  step      Int      @default(1)         // highest step reached
+  completed Boolean  @default(false)
+
+  // Step 2 — contact info
+  phone     String?
+  firstName String?
+  lastName  String?
+  email     String?
+
+  // Step 3/4 — property details
+  condition String?
+  timeline  String?
+  reason    String?
+
+  @@map("leads")
+}
