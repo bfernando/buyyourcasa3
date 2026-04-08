@@ -19,9 +19,20 @@ import type { NextRequest } from "next/server";
 
 const MOBILE_UA_REGEX =
   /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i;
+const APEX_DOMAIN = "buyyour.casa";
+const CANONICAL_DOMAIN = "www.buyyour.casa";
 
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+  const host = request.headers.get("host") ?? "";
+
+  // Keep the naked domain canonicalized to www once DNS is pointed to Vercel.
+  if (host === APEX_DOMAIN) {
+    const url = request.nextUrl.clone();
+    url.host = CANONICAL_DOMAIN;
+    url.protocol = "https";
+    return NextResponse.redirect(url, 308);
+  }
 
   // Only apply to the root path
   if (pathname !== "/") return NextResponse.next();
@@ -45,5 +56,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
