@@ -2,8 +2,10 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
-export default function FinalCTA() {
+export default function FinalCTA({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].finalCta;
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
 
@@ -13,7 +15,6 @@ export default function FinalCTA() {
       className="relative py-32 lg:py-48 overflow-hidden"
       style={{ background: "linear-gradient(180deg, #08080C 0%, #0C0C12 50%, #08080C 100%)" }}
     >
-      {/* Cinematic glow */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -21,7 +22,6 @@ export default function FinalCTA() {
         }}
       />
 
-      {/* Architectural line decorations */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <motion.div
           initial={{ scaleX: 0 }}
@@ -56,9 +56,9 @@ export default function FinalCTA() {
           className="font-display font-light text-cream mb-6 leading-[0.95]"
           style={{ fontSize: "clamp(3rem, 7vw, 6rem)" }}
         >
-          The offer is waiting.
+          {c.headline}
           <br />
-          <span className="italic text-gradient-gold">The next step is yours.</span>
+          <span className="italic text-gradient-gold">{c.headlineItalic}</span>
         </motion.h2>
 
         <motion.p
@@ -67,8 +67,7 @@ export default function FinalCTA() {
           transition={{ delay: 0.25, duration: 0.9 }}
           className="text-cream/50 font-body font-light text-lg leading-relaxed max-w-xl mx-auto mb-12"
         >
-          No obligation. No rush. Just a fair cash offer from a team that genuinely
-          respects your time, your situation, and your home.
+          {c.sub}
         </motion.p>
 
         <motion.div
@@ -82,7 +81,7 @@ export default function FinalCTA() {
             className="btn-gold px-10 py-4.5 rounded-sm inline-flex items-center gap-3 text-sm"
             style={{ paddingTop: "1.1rem", paddingBottom: "1.1rem" }}
           >
-            Get My Free Cash Offer
+            {c.cta}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8H13M8 3L13 8L8 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -95,13 +94,12 @@ export default function FinalCTA() {
           transition={{ delay: 0.6, duration: 0.8 }}
           className="flex flex-wrap items-center justify-center gap-6 mt-10 text-cream/25 text-xs font-body uppercase tracking-widest"
         >
-          <span>No obligation</span>
-          <span className="w-1 h-1 rounded-full bg-gold/30" />
-          <span>No repairs needed</span>
-          <span className="w-1 h-1 rounded-full bg-gold/30" />
-          <span>No agent fees</span>
-          <span className="w-1 h-1 rounded-full bg-gold/30" />
-          <span>Close in 7 days</span>
+          {c.micros.map((micro, i) => (
+            <>
+              <span key={micro}>{micro}</span>
+              {i < c.micros.length - 1 && <span key={`dot-${i}`} className="w-1 h-1 rounded-full bg-gold/30" />}
+            </>
+          ))}
         </motion.div>
       </div>
     </section>

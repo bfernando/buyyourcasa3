@@ -2,33 +2,10 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
-/**
- * PainChipsMobile
- * ────────────────
- * UX: Pattern recognition over persuasion.
- * Mobile users won't read paragraphs. They'll scan for themselves.
- * Short question chips ("Facing foreclosure?") trigger instant recognition:
- * "They're talking about ME" — then they tap the CTA.
- *
- * Chips are large enough to tap but not interactive (no filter needed).
- * The emotion is in the questions, not the design.
- */
-
-const situations = [
-  "Facing foreclosure?",
-  "Inherited a house?",
-  "Going through divorce?",
-  "Tired of tenants?",
-  "Needs major repairs?",
-  "Relocating fast?",
-  "Behind on payments?",
-  "Downsizing?",
-  "Estate sale?",
-  "Problem property?",
-];
-
-export default function PainChipsMobile() {
+export default function PainChipsMobile({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].mobilePain;
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
 
@@ -36,7 +13,6 @@ export default function PainChipsMobile() {
     <section ref={ref} className="py-12 px-5 bg-surface">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/15 to-transparent" />
 
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -45,24 +21,23 @@ export default function PainChipsMobile() {
       >
         <div className="flex items-center gap-2 mb-3">
           <div className="w-5 h-px bg-gold/50" />
-          <span className="text-gold/60 text-[10px] uppercase tracking-[0.25em] font-body">We Understand</span>
+          <span className="text-gold/60 text-[10px] uppercase tracking-[0.25em] font-body">{c.eyebrow}</span>
         </div>
         <h2 className="font-display font-light text-cream text-4xl leading-tight">
-          Sound familiar?
+          {c.headline}
         </h2>
         <p className="text-cream/45 font-body text-sm mt-2 leading-relaxed">
-          We&apos;ve helped homeowners in every one of these situations.
+          {c.sub}
         </p>
       </motion.div>
 
-      {/* Chips grid */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={isInView ? { opacity: 1 } : {}}
         transition={{ delay: 0.15, duration: 0.6 }}
         className="flex flex-wrap gap-2 mb-8"
       >
-        {situations.map((s, i) => (
+        {c.chips.map((s, i) => (
           <motion.span
             key={s}
             initial={{ opacity: 0, scale: 0.92 }}
@@ -75,22 +50,21 @@ export default function PainChipsMobile() {
         ))}
       </motion.div>
 
-      {/* Empathy line + CTA */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.6, duration: 0.6 }}
       >
         <p className="text-cream/40 font-body text-sm mb-5 leading-relaxed">
-          Whatever your situation — we meet you where you are,{" "}
-          <span className="text-cream/70">without judgment or pressure.</span>
+          {c.empathy}{" "}
+          <span className="text-cream/70">{c.empathyStrong}</span>
         </p>
         <a
           href="#mobile-form"
           className="btn-outline w-full h-12 rounded-sm flex items-center justify-center gap-2 text-sm uppercase tracking-wide font-body font-medium"
           style={{ touchAction: "manipulation" }}
         >
-          Get a No-Pressure Offer
+          {c.cta}
         </a>
       </motion.div>
     </section>

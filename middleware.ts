@@ -34,22 +34,24 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Only apply to the root path
-  if (pathname !== "/") return NextResponse.next();
+  // Only apply to the root and /es paths
+  if (pathname !== "/" && pathname !== "/es") return NextResponse.next();
 
   // Allow ?preview=desktop to bypass redirect on mobile
   if (searchParams.get("preview") === "desktop") return NextResponse.next();
 
   // Allow ?preview=mobile to force mobile view on desktop
   if (searchParams.get("preview") === "mobile") {
-    return NextResponse.redirect(new URL("/m", request.url));
+    const mobileTarget = pathname === "/es" ? "/es/m" : "/m";
+    return NextResponse.redirect(new URL(mobileTarget, request.url));
   }
 
   const ua = request.headers.get("user-agent") ?? "";
   const isMobile = MOBILE_UA_REGEX.test(ua);
 
   if (isMobile) {
-    return NextResponse.redirect(new URL("/m", request.url));
+    const mobileTarget = pathname === "/es" ? "/es/m" : "/m";
+    return NextResponse.redirect(new URL(mobileTarget, request.url));
   }
 
   return NextResponse.next();

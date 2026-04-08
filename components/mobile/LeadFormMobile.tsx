@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
 /**
  * LeadFormMobile
@@ -46,34 +47,7 @@ type FormData = {
 
 const TOTAL_STEPS = 5;
 
-// Step labels for progress bar
-const stepLabels = ["Address", "Phone", "Name", "Details", "Confirm"];
-
-const conditionOptions = [
-  { value: "excellent", emoji: "✨", label: "Great Shape", sub: "Move-in ready" },
-  { value: "good", emoji: "👍", label: "Good", sub: "Minor cosmetic work" },
-  { value: "fair", emoji: "🔨", label: "Needs Work", sub: "Some repairs" },
-  { value: "poor", emoji: "🏚", label: "Major Work", sub: "Significant damage" },
-];
-
-const timelineOptions = [
-  { value: "asap", label: "ASAP", sub: "7–14 days" },
-  { value: "30days", label: "30 Days", sub: "Somewhat urgent" },
-  { value: "90days", label: "1–3 Months", sub: "Planning ahead" },
-  { value: "flexible", label: "Flexible", sub: "No deadline" },
-];
-
-const reasonOptions = [
-  "Foreclosure / Behind on Payments",
-  "Inherited Property",
-  "Divorce",
-  "Relocating",
-  "Tired Landlord",
-  "Major Repairs",
-  "Downsizing",
-  "Estate Sale",
-  "Other / Prefer Not to Say",
-];
+// Options come from content — see LeadFormMobile component
 
 // ─── MobileOptionCard ────────────────────────────────────────────────────────
 function OptionCard({
@@ -165,9 +139,11 @@ function MobileProgress({ step }: { step: number }) {
 // ─── Main form ───────────────────────────────────────────────────────────────
 interface LeadFormMobileProps {
   prefillAddress?: string;
+  lang?: Locale;
 }
 
-export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobileProps) {
+export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: LeadFormMobileProps) {
+  const c = content[lang].mobileForm;
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
   const [submitted, setSubmitted] = useState(false);
@@ -316,11 +292,11 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-5 h-px bg-gold/50" />
-            <span className="text-gold/60 text-[10px] uppercase tracking-[0.25em] font-body">Get Started</span>
+            <span className="text-gold/60 text-[10px] uppercase tracking-[0.25em] font-body">{c.eyebrow}</span>
           </div>
           <h2 className="font-display font-light text-cream text-4xl leading-tight">
-            Your offer is{" "}
-            <span className="italic text-gradient-gold">2 minutes away</span>
+            {c.headline}{" "}
+            <span className="italic text-gradient-gold">{c.headlineItalic}</span>
           </h2>
         </div>
       )}
@@ -345,13 +321,13 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 {step === 1 && (
                   <div className="flex flex-col gap-5">
                     <div>
-                      <h3 className="font-display text-2xl text-cream mb-1.5">Where is the property?</h3>
-                      <p className="text-cream/40 font-body text-sm">Just the address to get started.</p>
+                      <h3 className="font-display text-2xl text-cream mb-1.5">{c.steps[0].title}</h3>
+                      <p className="text-cream/40 font-body text-sm">{c.steps[0].sub}</p>
                     </div>
                     <MobileInput
                       id="m-address"
-                      label="Property Address"
-                      placeholder="123 Maple Street, Atlanta, GA"
+                      label={c.steps[0].label}
+                      placeholder={c.steps[0].placeholder}
                       value={form.address}
                       onChange={(v) => update("address", v)}
                       error={errors.address}
@@ -365,15 +341,15 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 {step === 2 && (
                   <div className="flex flex-col gap-5">
                     <div>
-                      <h3 className="font-display text-2xl text-cream mb-1.5">What&apos;s your phone number?</h3>
-                      <p className="text-cream/40 font-body text-sm">We&apos;ll call or text you with your offer.</p>
+                      <h3 className="font-display text-2xl text-cream mb-1.5">{c.steps[1].title}</h3>
+                      <p className="text-cream/40 font-body text-sm">{c.steps[1].sub}</p>
                     </div>
                     <MobileInput
                       id="m-phone"
                       type="tel"
                       inputMode="tel"
-                      label="Phone Number"
-                      placeholder="(555) 000-0000"
+                      label={c.steps[1].label}
+                      placeholder={c.steps[1].placeholder}
                       value={form.phone}
                       onChange={(v) => update("phone", v)}
                       error={errors.phone}
@@ -385,7 +361,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                         <path d="M7.5 1.5A6 6 0 1 1 7.5 13.5 6 6 0 0 1 7.5 1.5z" stroke="#C9A96E" strokeWidth="1.2"/>
                         <path d="M7.5 6.5v4M7.5 4.5v.5" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
-                      <p className="text-cream/40 font-body text-xs">We never sell or share your number.</p>
+                      <p className="text-cream/40 font-body text-xs">{c.steps[1].privacyNote}</p>
                     </div>
                   </div>
                 )}
@@ -394,13 +370,13 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 {step === 3 && (
                   <div className="flex flex-col gap-5">
                     <div>
-                      <h3 className="font-display text-2xl text-cream mb-1.5">What&apos;s your name?</h3>
-                      <p className="text-cream/40 font-body text-sm">So we know who to address your offer to.</p>
+                      <h3 className="font-display text-2xl text-cream mb-1.5">{c.steps[2].title}</h3>
+                      <p className="text-cream/40 font-body text-sm">{c.steps[2].sub}</p>
                     </div>
                     <MobileInput
                       id="m-first"
-                      label="First Name"
-                      placeholder="First name"
+                      label={c.steps[2].labels!.first}
+                      placeholder={c.steps[2].placeholders!.first}
                       value={form.firstName}
                       onChange={(v) => update("firstName", v)}
                       error={errors.firstName}
@@ -409,8 +385,8 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                     />
                     <MobileInput
                       id="m-last"
-                      label="Last Name"
-                      placeholder="Last name"
+                      label={c.steps[2].labels!.last}
+                      placeholder={c.steps[2].placeholders!.last}
                       value={form.lastName}
                       onChange={(v) => update("lastName", v)}
                       error={errors.lastName}
@@ -420,8 +396,8 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                       id="m-email"
                       type="email"
                       inputMode="email"
-                      label="Email (optional)"
-                      placeholder="you@example.com"
+                      label={c.steps[2].labels!.email}
+                      placeholder={c.steps[2].placeholders!.email}
                       value={form.email}
                       onChange={(v) => update("email", v)}
                       autoComplete="email"
@@ -433,18 +409,20 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 {step === 4 && (
                   <div className="flex flex-col gap-6">
                     <div>
-                      <h3 className="font-display text-2xl text-cream mb-1.5">Tell us about the property</h3>
-                      <p className="text-cream/40 font-body text-sm">Two quick questions — no wrong answers.</p>
+                      <h3 className="font-display text-2xl text-cream mb-1.5">{c.steps[3].title}</h3>
+                      <p className="text-cream/40 font-body text-sm">{c.steps[3].sub}</p>
                     </div>
 
                     {/* Condition */}
                     <div>
-                      <p className="text-xs uppercase tracking-widest text-cream/45 font-body mb-3">Property Condition</p>
+                      <p className="text-xs uppercase tracking-widest text-cream/45 font-body mb-3">{c.conditionLabel}</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {conditionOptions.map((opt) => (
+                        {c.conditions.map((opt) => (
                           <OptionCard
                             key={opt.value}
-                            {...opt}
+                            emoji={opt.emoji}
+                            label={opt.label}
+                            sub={opt.sub}
                             selected={form.condition === opt.value}
                             onClick={() => update("condition", opt.value)}
                           />
@@ -455,9 +433,9 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
 
                     {/* Timeline */}
                     <div>
-                      <p className="text-xs uppercase tracking-widest text-cream/45 font-body mb-3">Ideal Closing Timeline</p>
+                      <p className="text-xs uppercase tracking-widest text-cream/45 font-body mb-3">{c.timelineLabel}</p>
                       <div className="flex flex-col gap-2">
-                        {timelineOptions.map((opt) => (
+                        {c.timelines.map((opt) => (
                           <OptionCard
                             key={opt.value}
                             label={opt.label}
@@ -473,7 +451,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                     {/* Reason (optional) */}
                     <div>
                       <label htmlFor="m-reason" className="text-xs uppercase tracking-widest text-cream/45 font-body block mb-2">
-                        Reason for Selling <span className="text-cream/25 normal-case">(optional)</span>
+                        {c.reasonLabel} <span className="text-cream/25 normal-case">{c.reasonOptional}</span>
                       </label>
                       <select
                         id="m-reason"
@@ -482,8 +460,8 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                         className="form-input w-full h-14 px-4 rounded-sm appearance-none"
                         style={{ fontSize: 16 }}
                       >
-                        <option value="">Select if you&apos;d like...</option>
-                        {reasonOptions.map((r) => (
+                        <option value="">{c.reasonDefault}</option>
+                        {c.reasons.map((r) => (
                           <option key={r} value={r} className="bg-[#16161E]">{r}</option>
                         ))}
                       </select>
@@ -496,22 +474,22 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                   <div className="flex flex-col gap-5">
                     <div>
                       <h3 className="font-display text-2xl text-cream mb-1.5">
-                        Looks good, {form.firstName || "friend"}.
+                        {c.steps[4].title} {form.firstName || ""}
                       </h3>
                       <p className="text-cream/40 font-body text-sm">
-                        Review and submit — we&apos;ll have your offer within 24 hours.
+                        {c.steps[4].sub}
                       </p>
                     </div>
 
                     {/* Summary */}
                     <div className="bg-obsidian-900 border border-surface-border rounded-sm divide-y divide-surface-border">
                       {[
-                        { label: "Property", value: form.address, step: 1 },
-                        { label: "Phone", value: form.phone, step: 2 },
-                        { label: "Name", value: `${form.firstName} ${form.lastName}`, step: 3 },
+                        { label: c.summaryLabels.property, value: form.address, step: 1 },
+                        { label: c.summaryLabels.phone, value: form.phone, step: 2 },
+                        { label: c.summaryLabels.name, value: `${form.firstName} ${form.lastName}`, step: 3 },
                         {
-                          label: "Condition",
-                          value: `${conditionOptions.find(c => c.value === form.condition)?.label ?? "—"} · ${timelineOptions.find(t => t.value === form.timeline)?.label ?? "—"}`,
+                          label: c.summaryLabels.condition,
+                          value: `${c.conditions.find(o => o.value === form.condition)?.label ?? "—"} · ${c.timelines.find(o => o.value === form.timeline)?.label ?? "—"}`,
                           step: 4,
                         },
                       ].map((row) => (
@@ -525,15 +503,14 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                             className="text-gold/50 text-xs font-body hover:text-gold transition-colors shrink-0 mt-3"
                             style={{ touchAction: "manipulation" }}
                           >
-                            Edit
+                              {c.editLabel}
                           </button>
                         </div>
                       ))}
                     </div>
 
                     <p className="text-cream/25 font-body text-xs leading-relaxed">
-                      By submitting, you agree to be contacted about your property.
-                      We respect your privacy — no spam, no third-party sharing.
+                      {c.privacyNote}
                     </p>
                   </div>
                 )}
@@ -549,7 +526,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 className="btn-gold h-14 w-full rounded-sm flex items-center justify-center gap-2 text-sm font-semibold uppercase tracking-wide"
                 style={{ touchAction: "manipulation" }}
               >
-                Continue
+                {c.cta}
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M2.5 7H11.5M7.5 3L11.5 7L7.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -560,7 +537,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 className="btn-gold h-14 w-full rounded-sm flex items-center justify-center gap-2.5 text-sm font-semibold uppercase tracking-wide"
                 style={{ touchAction: "manipulation" }}
               >
-                Get My Cash Offer
+                {c.submitCta}
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M2.5 7H11.5M7.5 3L11.5 7L7.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -568,7 +545,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
             )}
 
             <p className="text-center text-cream/25 text-xs font-body">
-              No obligation · No spam · Free
+              {c.microcopy}
             </p>
 
             {step > 1 && (
@@ -577,7 +554,7 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
                 className="text-cream/35 text-sm font-body text-center py-2 hover:text-cream/60 transition-colors"
                 style={{ touchAction: "manipulation" }}
               >
-                ← Back
+                {c.backLabel}
               </button>
             )}
           </div>
@@ -609,17 +586,14 @@ export default function LeadFormMobile({ prefillAddress = "" }: LeadFormMobilePr
           </div>
 
           <h3 className="font-display text-3xl text-cream mb-3 leading-tight">
-            You&apos;re all set,<br />{form.firstName}.
+            {c.successTitle}<br />{form.firstName}.
           </h3>
           <p className="text-cream/50 font-body text-base leading-relaxed mb-6 max-w-xs">
-            Our team will reach out within 24 hours with your cash offer.
-            No pressure, no obligation.
+            {c.successSub}
           </p>
 
           <div className="flex flex-col gap-1 text-cream/25 text-xs font-body uppercase tracking-widest">
-            <span>No obligation</span>
-            <span>No pressure</span>
-            <span>Just a fair offer</span>
+            {c.stepLabels.map((l) => <span key={l}>{l}</span>)}
           </div>
 
           {/* Call option on success */}

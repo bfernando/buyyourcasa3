@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
-/**
- * StickyCTA
- * ─────────
- * UX rationale: The sticky CTA ensures "Get My Cash Offer" is always one
- * thumb-tap away regardless of where the user is in the scroll journey.
- * It hides when: (a) the hero CTA is visible, (b) the form section is visible —
- * so it never competes with the primary conversion UI.
- * Bottom placement = thumb zone on both iOS and Android.
- */
-export default function StickyCTA() {
+export default function StickyCTA({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].nav;
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -26,7 +19,6 @@ export default function StickyCTA() {
       const formTop = form?.getBoundingClientRect().top ?? 9999;
       const winH = window.innerHeight;
 
-      // Show when hero is scrolled past AND form is not yet in view
       const pastHero = heroBottom < winH * 0.5;
       const formVisible = formTop < winH * 0.85;
 
@@ -57,10 +49,8 @@ export default function StickyCTA() {
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
         >
           <div className="flex items-center gap-3 max-w-sm mx-auto">
-            {/* Click-to-call */}
-            {/* Replace href with your real phone number */}
             <a
-              href="tel:+15550001234"
+              href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}
               className="shrink-0 w-12 h-12 rounded-sm border border-surface-border bg-surface flex items-center justify-center text-gold/70 hover:text-gold hover:border-gold/30 transition-colors"
               aria-label="Call us"
               style={{ touchAction: "manipulation" }}
@@ -70,13 +60,12 @@ export default function StickyCTA() {
               </svg>
             </a>
 
-            {/* Primary CTA */}
             <a
               href="#mobile-form"
               className="btn-gold flex-1 h-12 rounded-sm flex items-center justify-center gap-2 text-sm font-body font-semibold tracking-wide uppercase"
               style={{ touchAction: "manipulation" }}
             >
-              Get My Cash Offer
+              {c.cta}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M2.5 7H11.5M7.5 3L11.5 7L7.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

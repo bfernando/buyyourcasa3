@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
-export default function Hero() {
+export default function Hero({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].hero;
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -118,7 +120,7 @@ export default function Hero() {
         >
           <div className="w-8 h-px bg-gold/60" />
           <span className="text-gold/80 uppercase tracking-[0.25em] text-[11px] font-body font-medium">
-            White-Glove Cash Offer Experience
+            {c.eyebrow}
           </span>
         </motion.div>
 
@@ -131,9 +133,9 @@ export default function Hero() {
             className="font-display font-light leading-[0.95] tracking-[-0.03em] mb-6"
             style={{ fontSize: "clamp(3.2rem, 8vw, 7rem)" }}
           >
-            <span className="block text-cream">Your Home.</span>
-            <span className="block text-cream">Your Terms.</span>
-            <span className="block text-gradient-gold italic">Your Cash.</span>
+            <span className="block text-cream">{c.lines[0]}</span>
+            <span className="block text-cream">{c.lines[1]}</span>
+            <span className="block text-gradient-gold italic">{c.lines[2]}</span>
           </motion.h1>
 
           <motion.p
@@ -143,9 +145,7 @@ export default function Hero() {
             className="text-cream/60 font-body font-light leading-relaxed max-w-xl mb-10"
             style={{ fontSize: "clamp(1rem, 1.8vw, 1.2rem)" }}
           >
-            Skip the repairs, the showings, and the uncertainty.
-            We make fair, all-cash offers in as little as 24 hours —
-            and close on your schedule, not ours.
+            {c.sub}
           </motion.p>
 
           {/* CTAs */}
@@ -159,7 +159,7 @@ export default function Hero() {
               href="#form"
               className="btn-gold px-8 py-4 rounded-sm inline-flex items-center justify-center gap-2.5 text-sm"
             >
-              Get My Cash Offer
+              {c.cta}
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8H13M8 3L13 8L8 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -168,7 +168,7 @@ export default function Hero() {
               href="#how-it-works"
               className="btn-outline px-8 py-4 rounded-sm inline-flex items-center justify-center gap-2.5 text-sm"
             >
-              See How It Works
+              {c.secondaryCta}
             </a>
           </motion.div>
         </div>
@@ -180,12 +180,7 @@ export default function Hero() {
           transition={{ delay: 1.0, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
           className="mt-16 pt-8 border-t border-surface-border flex flex-wrap gap-8 lg:gap-16"
         >
-          {[
-            { value: "500+", label: "Homes Purchased" },
-            { value: "24 hrs", label: "Offer Turnaround" },
-            { value: "$0", label: "Commissions or Fees" },
-            { value: "7 days", label: "Minimum Closing" },
-          ].map((stat) => (
+          {c.stats.map((stat) => (
             <div key={stat.label}>
               <div className="font-display text-3xl font-light text-gradient-gold">{stat.value}</div>
               <div className="text-xs text-cream/40 uppercase tracking-widest mt-1 font-body">{stat.label}</div>

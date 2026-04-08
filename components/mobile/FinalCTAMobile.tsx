@@ -2,18 +2,10 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
-/**
- * FinalCTAMobile
- * ───────────────
- * UX: Last chance for still-undecided users.
- * Emotionally satisfying close — not pushy, just clear and confident.
- * One CTA only. Trust reinforcement underneath.
- * The padding-bottom accounts for the sticky CTA bar (which reappears here
- * since the form section is above, not below).
- */
-
-export default function FinalCTAMobile() {
+export default function FinalCTAMobile({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].finalCta;
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
 
@@ -26,7 +18,6 @@ export default function FinalCTAMobile() {
         paddingBottom: "calc(5rem + env(safe-area-inset-bottom))",
       }}
     >
-      {/* Ambient gold glow */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -35,7 +26,6 @@ export default function FinalCTAMobile() {
       />
 
       <div className="relative z-10 text-center">
-        {/* Decorative divider */}
         <motion.div
           initial={{ opacity: 0, scaleX: 0 }}
           animate={isInView ? { opacity: 1, scaleX: 1 } : {}}
@@ -54,7 +44,7 @@ export default function FinalCTAMobile() {
           className="font-display font-light text-cream leading-[0.95] tracking-[-0.025em] mb-4"
           style={{ fontSize: "clamp(2.8rem, 11vw, 4rem)" }}
         >
-          The offer is waiting.
+          {c.headline}
         </motion.h2>
 
         <motion.p
@@ -63,7 +53,7 @@ export default function FinalCTAMobile() {
           transition={{ delay: 0.2, duration: 0.7 }}
           className="font-display italic text-gradient-gold text-3xl mb-7"
         >
-          The next step is yours.
+          {c.headlineItalic}
         </motion.p>
 
         <motion.p
@@ -72,7 +62,7 @@ export default function FinalCTAMobile() {
           transition={{ delay: 0.3, duration: 0.6 }}
           className="text-cream/45 font-body font-light text-base leading-relaxed mb-9 max-w-xs mx-auto"
         >
-          No obligation. No rush. A fair cash offer from a team that respects you.
+          {c.sub}
         </motion.p>
 
         <motion.a
@@ -83,7 +73,7 @@ export default function FinalCTAMobile() {
           className="btn-gold w-full h-14 rounded-sm flex items-center justify-center gap-2 text-sm font-semibold uppercase tracking-wide mx-auto"
           style={{ touchAction: "manipulation" }}
         >
-          Get My Free Cash Offer
+          {c.cta}
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 8H13M8 3L13 8L8 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -95,8 +85,9 @@ export default function FinalCTAMobile() {
           transition={{ delay: 0.6, duration: 0.6 }}
           className="flex flex-col gap-1 mt-6 text-cream/20 text-[10px] font-body uppercase tracking-widest"
         >
-          <span>No obligation · No repairs · No fees</span>
-          <span>Offer in 24 hours · Close in 7 days</span>
+          {c.micros.map((m) => (
+            <span key={m}>{m}</span>
+          ))}
         </motion.div>
       </div>
     </section>

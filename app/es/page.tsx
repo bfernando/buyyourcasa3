@@ -11,20 +11,25 @@ import LeadForm from "@/components/LeadForm";
 import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
 
-export default function Home() {
+export const metadata = {
+  title: "BuyYourCasa — Oferta en Efectivo por tu Casa en 24 Horas",
+  description: "Vendemos tu casa rápido, sin reparaciones, sin comisiones y sin estrés. Oferta en efectivo en 24 horas.",
+};
+
+export default function SpanishHome() {
   return (
     <main>
-      <Navigation />
-      <Hero />
-      <TrustBar />
-      <HowItWorks />
-      <PainToRelief />
-      <Comparison />
-      <Testimonials />
-      <ServiceArea />
-      <FAQ />
-      <LeadForm />
-      <FinalCTA />
+      <Navigation lang="es" />
+      <Hero lang="es" />
+      <TrustBar lang="es" />
+      <HowItWorks lang="es" />
+      <PainToRelief lang="es" />
+      <Comparison lang="es" />
+      <Testimonials lang="es" />
+      <ServiceArea lang="es" />
+      <FAQ lang="es" />
+      <LeadForm lang="es" />
+      <FinalCTA lang="es" />
       <Footer />
     </main>
   );

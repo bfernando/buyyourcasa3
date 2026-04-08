@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormData = {
@@ -26,50 +27,16 @@ const initialData: FormData = {
   reason: "",
 };
 
-// ─── Step config ──────────────────────────────────────────────────────────────
-const steps = [
-  { label: "Property", number: 1 },
-  { label: "Contact", number: 2 },
-  { label: "Details", number: 3 },
-  { label: "Confirm", number: 4 },
-];
-
-// ─── Option components ────────────────────────────────────────────────────────
-const conditionOptions = [
-  { value: "excellent", label: "Great Shape", sub: "Move-in ready, minimal work needed" },
-  { value: "good", label: "Good Condition", sub: "Minor cosmetic updates" },
-  { value: "fair", label: "Fair Condition", sub: "Some repairs needed" },
-  { value: "poor", label: "Needs Work", sub: "Significant repairs or damage" },
-];
-
-const timelineOptions = [
-  { value: "asap", label: "ASAP", sub: "7–14 days if possible" },
-  { value: "1_month", label: "Within 30 Days", sub: "Flexible but soon" },
-  { value: "3_months", label: "1–3 Months", sub: "Planning ahead" },
-  { value: "flexible", label: "Flexible", sub: "No hard deadline" },
-];
-
-const reasonOptions = [
-  "Inherited Property",
-  "Foreclosure / Behind on Payments",
-  "Divorce",
-  "Relocating",
-  "Tired Landlord",
-  "Major Repairs Needed",
-  "Downsizing",
-  "Estate Sale",
-  "Financial Hardship",
-  "Other / Prefer Not to Say",
-];
+// ─── Step config (static numbers only, labels from content) ──────────────────
+const STEP_NUMBERS = [1, 2, 3, 4];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function ProgressBar({ currentStep }: { currentStep: number }) {
+function ProgressBar({ currentStep, stepLabels }: { currentStep: number; stepLabels: string[] }) {
   return (
     <div className="mb-10">
       <div className="flex items-center justify-between mb-3">
-        {steps.map((step, i) => (
-          <div key={step.number} className="flex items-center gap-0">
-            {/* Step dot */}
+        {STEP_NUMBERS.map((num, i) => (
+          <div key={num} className="flex items-center gap-0">
             <div className="flex flex-col items-center gap-1.5">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium font-body transition-all duration-500 ${
@@ -85,18 +52,17 @@ function ProgressBar({ currentStep }: { currentStep: number }) {
                     <path d="M2.5 7l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 ) : (
-                  step.number
+                  num
                 )}
               </div>
               <span className={`text-[10px] uppercase tracking-wider font-body hidden sm:block transition-colors duration-300 ${
                 i + 1 === currentStep ? "text-gold" : i + 1 < currentStep ? "text-cream/60" : "text-cream/25"
               }`}>
-                {step.label}
+                {stepLabels[i]}
               </span>
             </div>
 
-            {/* Connector line */}
-            {i < steps.length - 1 && (
+            {i < STEP_NUMBERS.length - 1 && (
               <div className="flex-1 h-px mx-2 mt-[-11px] overflow-hidden bg-surface-border min-w-[20px] sm:min-w-[40px]">
                 <motion.div
                   className="h-full bg-gold/60"
@@ -199,7 +165,8 @@ function OptionCard({
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function LeadForm() {
+export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].form;
   const sectionRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-80px" });
 
@@ -358,7 +325,7 @@ export default function LeadForm() {
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-px bg-gold/40" />
               <span className="text-gold/70 uppercase tracking-[0.25em] text-[11px] font-body">
-                Get Started
+                {c.eyebrow}
               </span>
             </div>
 
@@ -366,25 +333,19 @@ export default function LeadForm() {
               className="font-display font-light text-cream mb-6 leading-[1.0]"
               style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}
             >
-              Two minutes.{" "}
-              <span className="italic text-gradient-gold">A fair offer.</span>
+              {c.headline}{" "}
+              <span className="italic text-gradient-gold">{c.headlineItalic}</span>
               <br />
-              No strings attached.
+              {c.headlineSuffix}
             </h2>
 
             <p className="text-cream/50 font-body font-light text-base leading-relaxed mb-10">
-              Tell us about your property and we&apos;ll have a fair, no-obligation cash offer
-              back to you within 24 hours. It really is that simple.
+              {c.sub}
             </p>
 
             {/* Reassurance bullets */}
             <div className="flex flex-col gap-4 mb-12">
-              {[
-                "No obligation — you decide if it works for you",
-                "We never share or sell your information",
-                "No inspection or photos needed to get started",
-                "Our team personally reviews every submission",
-              ].map((item) => (
+              {c.reassurances.map((item) => (
                 <div key={item} className="flex items-start gap-3">
                   <div className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-gold/10 flex items-center justify-center">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -439,7 +400,7 @@ export default function LeadForm() {
               <div className="p-8 lg:p-10">
                 {!submitted ? (
                   <>
-                    <ProgressBar currentStep={step} />
+                    <ProgressBar currentStep={step} stepLabels={c.summaryLabels ? [c.summaryLabels.property, c.summaryLabels.contact, c.summaryLabels.details, c.steps[3].title] : ["Property", "Contact", "Details", "Confirm"]} />
 
                     {/* Step content */}
                     <div className="overflow-hidden" style={{ minHeight: 280 }}>
@@ -458,24 +419,21 @@ export default function LeadForm() {
                             <div className="flex flex-col gap-6">
                               <div>
                                 <h3 className="font-display text-2xl text-cream mb-2">
-                                  Where is the property?
+                                  {c.steps[0].title}
                                 </h3>
                                 <p className="text-cream/40 font-body text-sm">
-                                  Enter the full address and we&apos;ll begin pulling local data right away.
+                                  {c.steps[0].sub}
                                 </p>
                               </div>
                               <InputField
                                 id="address"
-                                label="Property Address"
-                                placeholder="123 Maple Street, Atlanta, GA 30301"
+                                label={c.steps[0].label}
+                                placeholder={c.steps[0].placeholder}
                                 value={formData.address}
                                 onChange={(v) => update("address", v)}
                                 error={errors.address}
                                 autoComplete="street-address"
                               />
-                              <p className="text-cream/30 text-xs font-body">
-                                Start with the street address. City and state help us pull comparables.
-                              </p>
                             </div>
                           )}
 
@@ -484,17 +442,17 @@ export default function LeadForm() {
                             <div className="flex flex-col gap-5">
                               <div>
                                 <h3 className="font-display text-2xl text-cream mb-2">
-                                  How do we reach you?
+                                  {c.steps[1].title}
                                 </h3>
                                 <p className="text-cream/40 font-body text-sm">
-                                  We&apos;ll use this only to deliver your cash offer — nothing else.
+                                  {c.steps[1].sub}
                                 </p>
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                 <InputField
                                   id="firstName"
-                                  label="First Name"
-                                  placeholder="First name"
+                                  label={c.steps[1].labels!.firstName}
+                                  placeholder={c.steps[1].placeholders!.firstName}
                                   value={formData.firstName}
                                   onChange={(v) => update("firstName", v)}
                                   error={errors.firstName}
@@ -502,8 +460,8 @@ export default function LeadForm() {
                                 />
                                 <InputField
                                   id="lastName"
-                                  label="Last Name"
-                                  placeholder="Last name"
+                                  label={c.steps[1].labels!.lastName}
+                                  placeholder={c.steps[1].placeholders!.lastName}
                                   value={formData.lastName}
                                   onChange={(v) => update("lastName", v)}
                                   error={errors.lastName}
@@ -512,9 +470,9 @@ export default function LeadForm() {
                               </div>
                               <InputField
                                 id="phone"
-                                label="Phone Number"
+                                label={c.steps[1].labels!.phone}
                                 type="tel"
-                                placeholder="(555) 000-0000"
+                                placeholder={c.steps[1].placeholders!.phone}
                                 value={formData.phone}
                                 onChange={(v) => update("phone", v)}
                                 error={errors.phone}
@@ -522,9 +480,9 @@ export default function LeadForm() {
                               />
                               <InputField
                                 id="email"
-                                label="Email Address"
+                                label={c.steps[1].labels!.email}
                                 type="email"
-                                placeholder="you@example.com"
+                                placeholder={c.steps[1].placeholders!.email}
                                 value={formData.email}
                                 onChange={(v) => update("email", v)}
                                 error={errors.email}
@@ -538,20 +496,20 @@ export default function LeadForm() {
                             <div className="flex flex-col gap-6">
                               <div>
                                 <h3 className="font-display text-2xl text-cream mb-2">
-                                  Tell us a bit more
+                                  {c.steps[2].title}
                                 </h3>
                                 <p className="text-cream/40 font-body text-sm">
-                                  These details help us tailor a more accurate offer for your situation.
+                                  {c.steps[2].sub}
                                 </p>
                               </div>
 
                               {/* Condition */}
                               <div>
                                 <p className="text-xs uppercase tracking-widest text-cream/50 font-body mb-3">
-                                  Property Condition
+                                  {c.conditionLabel}
                                 </p>
                                 <div className="grid grid-cols-2 gap-2.5">
-                                  {conditionOptions.map((opt) => (
+                                  {c.conditions.map((opt) => (
                                     <OptionCard
                                       key={opt.value}
                                       value={opt.value}
@@ -570,10 +528,10 @@ export default function LeadForm() {
                               {/* Timeline */}
                               <div>
                                 <p className="text-xs uppercase tracking-widest text-cream/50 font-body mb-3">
-                                  Ideal Closing Timeline
+                                  {c.timelineLabel}
                                 </p>
                                 <div className="grid grid-cols-2 gap-2.5">
-                                  {timelineOptions.map((opt) => (
+                                  {c.timelines.map((opt) => (
                                     <OptionCard
                                       key={opt.value}
                                       value={opt.value}
@@ -595,18 +553,18 @@ export default function LeadForm() {
                                   htmlFor="reason"
                                   className="text-xs uppercase tracking-widest text-cream/50 font-body block mb-2"
                                 >
-                                  Reason for Selling{" "}
-                                  <span className="text-cream/25 normal-case">(optional)</span>
+                                  {c.reasonLabel}{" "}
+                                  <span className="text-cream/25 normal-case">{c.reasonOptional}</span>
                                 </label>
                                 <select
                                   id="reason"
                                   value={formData.reason}
                                   onChange={(e) => update("reason", e.target.value)}
-                                  className="form-input w-full px-4 py-3.5 rounded-sm text-base appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23C9A96E%22%20stroke-width%3D%221.5%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_16px_center]"
+                                  className="form-input w-full px-4 py-3.5 rounded-sm text-base appearance-none"
                                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23C9A96E' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" }}
                                 >
-                                  <option value="" className="bg-[#16161E]">Select a reason...</option>
-                                  {reasonOptions.map((r) => (
+                                  <option value="" className="bg-[#16161E]">{c.reasonDefault}</option>
+                                  {c.reasons.map((r) => (
                                     <option key={r} value={r} className="bg-[#16161E]">{r}</option>
                                   ))}
                                 </select>
@@ -619,10 +577,10 @@ export default function LeadForm() {
                             <div className="flex flex-col gap-6">
                               <div>
                                 <h3 className="font-display text-2xl text-cream mb-2">
-                                  Review & Submit
+                                  {c.steps[3].title}
                                 </h3>
                                 <p className="text-cream/40 font-body text-sm">
-                                  Everything look right? We&apos;ll have your offer ready within 24 hours.
+                                  {c.steps[3].sub}
                                 </p>
                               </div>
 
@@ -630,31 +588,31 @@ export default function LeadForm() {
                               <div className="bg-surface border border-surface-border rounded-sm p-5 space-y-4">
                                 <div className="flex justify-between items-start border-b border-surface-border pb-4">
                                   <div>
-                                    <p className="text-xs text-cream/40 uppercase tracking-wider font-body mb-1">Property</p>
+                                    <p className="text-xs text-cream/40 uppercase tracking-wider font-body mb-1">{c.summaryLabels.property}</p>
                                     <p className="text-cream/85 font-body text-sm">{formData.address}</p>
                                   </div>
-                                  <button onClick={() => { setDirection(-1); setStep(1); }} className="text-gold/60 text-xs font-body hover:text-gold transition-colors">Edit</button>
+                                  <button onClick={() => { setDirection(-1); setStep(1); }} className="text-gold/60 text-xs font-body hover:text-gold transition-colors">{c.editLabel}</button>
                                 </div>
                                 <div className="flex justify-between items-start border-b border-surface-border pb-4">
                                   <div>
-                                    <p className="text-xs text-cream/40 uppercase tracking-wider font-body mb-1">Contact</p>
+                                    <p className="text-xs text-cream/40 uppercase tracking-wider font-body mb-1">{c.summaryLabels.contact}</p>
                                     <p className="text-cream/85 font-body text-sm">{formData.firstName} {formData.lastName}</p>
                                     <p className="text-cream/50 font-body text-xs mt-0.5">{formData.phone} · {formData.email}</p>
                                   </div>
-                                  <button onClick={() => { setDirection(-1); setStep(2); }} className="text-gold/60 text-xs font-body hover:text-gold transition-colors">Edit</button>
+                                  <button onClick={() => { setDirection(-1); setStep(2); }} className="text-gold/60 text-xs font-body hover:text-gold transition-colors">{c.editLabel}</button>
                                 </div>
                                 <div className="flex justify-between items-start">
                                   <div>
-                                    <p className="text-xs text-cream/40 uppercase tracking-wider font-body mb-1">Details</p>
-                                    <p className="text-cream/85 font-body text-sm capitalize">{formData.condition?.replace("_", " ")} condition · {formData.timeline?.replace("_", " ")} close</p>
+                                    <p className="text-xs text-cream/40 uppercase tracking-wider font-body mb-1">{c.summaryLabels.details}</p>
+                                    <p className="text-cream/85 font-body text-sm capitalize">{formData.condition?.replace("_", " ")} · {formData.timeline?.replace("_", " ")}</p>
                                     {formData.reason && <p className="text-cream/50 font-body text-xs mt-0.5">{formData.reason}</p>}
                                   </div>
-                                  <button onClick={() => { setDirection(-1); setStep(3); }} className="text-gold/60 text-xs font-body hover:text-gold transition-colors">Edit</button>
+                                  <button onClick={() => { setDirection(-1); setStep(3); }} className="text-gold/60 text-xs font-body hover:text-gold transition-colors">{c.editLabel}</button>
                                 </div>
                               </div>
 
                               <p className="text-cream/30 text-xs font-body leading-relaxed">
-                                By submitting, you agree to be contacted by our team. We respect your privacy — no spam, no sharing your info with third parties, ever.
+                                {c.privacyNote}
                               </p>
                             </div>
                           )}
@@ -672,7 +630,7 @@ export default function LeadForm() {
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                             <path d="M11.5 7H2.5M6.5 3L2.5 7L6.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
-                          Back
+                          {c.backLabel}
                         </button>
                       ) : (
                         <div />
@@ -683,7 +641,7 @@ export default function LeadForm() {
                           onClick={goNext}
                           className="btn-gold px-8 py-3.5 rounded-sm flex items-center gap-2 text-sm"
                         >
-                          Continue
+                          {c.cta}
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                             <path d="M2.5 7H11.5M7.5 3L11.5 7L7.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
@@ -693,7 +651,7 @@ export default function LeadForm() {
                           onClick={handleSubmit}
                           className="btn-gold px-8 py-3.5 rounded-sm flex items-center gap-2.5 text-sm"
                         >
-                          Submit & Get My Offer
+                          {c.submitCta}
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                             <path d="M2.5 7H11.5M7.5 3L11.5 7L7.5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
@@ -731,18 +689,18 @@ export default function LeadForm() {
                     </div>
 
                     <h3 className="font-display text-3xl text-cream mb-4">
-                      You&apos;re all set, {formData.firstName}.
+                      {c.successTitle} {formData.firstName}.
                     </h3>
                     <p className="text-cream/50 font-body font-light text-base leading-relaxed mb-6 max-w-sm mx-auto">
-                      We&apos;ve received your submission and a member of our team will be in touch
-                      within 24 hours with your cash offer.
+                      {c.successSub}
                     </p>
                     <div className="flex flex-wrap justify-center gap-4 text-xs font-body text-cream/30 uppercase tracking-widest">
-                      <span>No obligation</span>
-                      <span>·</span>
-                      <span>No pressure</span>
-                      <span>·</span>
-                      <span>Just a fair offer</span>
+                      {c.successMicro.map((m, i) => (
+                        <>
+                          <span key={m}>{m}</span>
+                          {i < c.successMicro.length - 1 && <span key={`d${i}`}>·</span>}
+                        </>
+                      ))}
                     </div>
                   </motion.div>
                 )}

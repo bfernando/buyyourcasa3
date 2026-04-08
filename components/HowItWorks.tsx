@@ -2,54 +2,28 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import { content, Locale } from "@/lib/content";
 
-const steps = [
-  {
-    number: "01",
-    title: "Tell Us About Your Property",
-    description:
-      "Fill out our simple 2-minute form — just the basics. Property address, your contact info, and a few details about your situation. No inspection, no photos needed.",
-    icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <path d="M14 3L4 8.5V20.5L14 26L24 20.5V8.5L14 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        <path d="M14 14m-3 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M14 3V14M14 14L4 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-      </svg>
-    ),
-    time: "2 minutes",
-  },
-  {
-    number: "02",
-    title: "We Review & Reach Out",
-    description:
-      "Our team personally reviews your property details and reaches out within 24 hours. We may ask a few light follow-up questions — nothing invasive, no pressure.",
-    icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <path d="M4 6.5h20v16H4z" rx="1.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        <path d="M4 6.5l10 9 10-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        <rect x="4" y="6.5" width="20" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
-      </svg>
-    ),
-    time: "Within 24 hours",
-  },
-  {
-    number: "03",
-    title: "Receive Your Cash Offer",
-    description:
-      "We present a clear, fair, all-cash offer — no lowballs, no games. Take your time to review it. If it works for you, we move forward. No obligation if it doesn't.",
-    icon: (
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <rect x="3" y="7" width="22" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M3 12h22" stroke="currentColor" strokeWidth="1.5"/>
-        <circle cx="8.5" cy="18" r="2" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M13 17h8M13 19h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
-    time: "No obligation",
-  },
+const stepIcons = [
+  <svg key="1" width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <path d="M14 3L4 8.5V20.5L14 26L24 20.5V8.5L14 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M14 14m-3 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M14 3V14M14 14L4 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+  </svg>,
+  <svg key="2" width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect x="4" y="6.5" width="20" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M4 6.5l10 9 10-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>,
+  <svg key="3" width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect x="3" y="7" width="22" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M3 12h22" stroke="currentColor" strokeWidth="1.5"/>
+    <circle cx="8.5" cy="18" r="2" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M13 17h8M13 19h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>,
 ];
 
-export default function HowItWorks() {
+export default function HowItWorks({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].howItWorks;
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -78,15 +52,15 @@ export default function HowItWorks() {
           <div className="flex items-center justify-center gap-3 mb-5">
             <div className="w-8 h-px bg-gold/40" />
             <span className="text-gold/70 uppercase tracking-[0.25em] text-[11px] font-body">
-              The Process
+              {c.eyebrow}
             </span>
             <div className="w-8 h-px bg-gold/40" />
           </div>
           <h2 className="font-display font-light text-cream mb-5" style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}>
-            Three steps to a stress-free sale
+            {c.headline}
           </h2>
           <p className="text-cream/50 font-body text-lg max-w-xl mx-auto font-light">
-            We&apos;ve stripped out every unnecessary step so selling your home feels simple again.
+            {c.sub}
           </p>
         </motion.div>
 
@@ -103,9 +77,9 @@ export default function HowItWorks() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-0">
-            {steps.map((step, i) => (
+            {c.steps.map((step, i) => (
               <motion.div
-                key={step.number}
+                key={i}
                 initial={{ opacity: 0, y: 32 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{
@@ -117,13 +91,10 @@ export default function HowItWorks() {
               >
                 {/* Step node */}
                 <div className="relative mb-8">
-                  {/* Outer ring */}
                   <div className="w-32 h-32 rounded-full border border-gold/20 flex items-center justify-center relative">
-                    {/* Inner circle */}
                     <div className="w-20 h-20 rounded-full bg-surface flex items-center justify-center border border-gold/15 shadow-gold-sm">
-                      <div className="text-gold">{step.icon}</div>
+                      <div className="text-gold">{stepIcons[i]}</div>
                     </div>
-                    {/* Number */}
                     <div className="absolute -top-2 -right-2 w-9 h-9 rounded-full bg-gold flex items-center justify-center">
                       <span className="font-display text-obsidian-900 text-sm font-semibold leading-none">
                         {i + 1}
@@ -156,7 +127,7 @@ export default function HowItWorks() {
           className="text-center mt-16 lg:mt-20"
         >
           <a href="#form" className="btn-gold px-8 py-4 rounded-sm inline-flex items-center gap-2.5 text-sm">
-            Start With Your Address
+            {c.cta}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8H13M8 3L13 8L8 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>

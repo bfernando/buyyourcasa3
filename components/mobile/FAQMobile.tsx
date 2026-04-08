@@ -2,43 +2,7 @@
 
 import { useRef, useState } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
-
-/**
- * FAQMobile
- * ──────────
- * UX: Large tap targets (min 56px per row).
- * Short answers — 2–3 sentences max. Mobile users won't read essays.
- * The FAQ exists to neutralize the last remaining objections before form submission.
- * Placed just before the final CTA, not before the form — users who FAQ first
- * are still undecided; after FAQing, hit them with the final push.
- */
-
-const faqs = [
-  {
-    q: "Are there any fees?",
-    a: "Zero. No commissions, no closing costs, no hidden fees. The offer number is what you receive.",
-  },
-  {
-    q: "Do I need to repair anything?",
-    a: "Absolutely not. We buy homes completely as-is, in any condition. Leave whatever you want behind.",
-  },
-  {
-    q: "How fast can we close?",
-    a: "As little as 7 business days after you accept. Or take 30, 60, 90 days — your timeline, not ours.",
-  },
-  {
-    q: "Am I obligated to accept?",
-    a: "Never. Our offer is 100% no-obligation. Review it, think it over, and decide with zero pressure.",
-  },
-  {
-    q: "What types of homes do you buy?",
-    a: "Single-family, condos, multi-family, inherited, tenant-occupied, vacant, even homes with title issues.",
-  },
-  {
-    q: "How is the offer calculated?",
-    a: "We look at recent comparable sales, your property's condition, and the local market. We always explain our numbers.",
-  },
-];
+import { content, Locale } from "@/lib/content";
 
 function FAQRow({ q, a, isInView, index }: { q: string; a: string; isInView: boolean; index: number }) {
   const [open, setOpen] = useState(false);
@@ -87,13 +51,13 @@ function FAQRow({ q, a, isInView, index }: { q: string; a: string; isInView: boo
   );
 }
 
-export default function FAQMobile() {
+export default function FAQMobile({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].faq;
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
 
   return (
     <section id="faq" ref={ref} className="py-12 px-5 bg-obsidian-900">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -102,18 +66,17 @@ export default function FAQMobile() {
       >
         <div className="flex items-center gap-2 mb-3">
           <div className="w-5 h-px bg-gold/50" />
-          <span className="text-gold/60 text-[10px] uppercase tracking-[0.25em] font-body">Questions</span>
+          <span className="text-gold/60 text-[10px] uppercase tracking-[0.25em] font-body">{c.eyebrow}</span>
         </div>
         <h2 className="font-display font-light text-cream text-4xl leading-tight">
-          Answered{" "}
-          <span className="italic text-gradient-gold">honestly</span>
+          {c.headline}{" "}
+          <span className="italic text-gradient-gold">{c.headlineItalic}</span>
         </h2>
       </motion.div>
 
-      {/* FAQ list */}
       <div>
-        {faqs.map((item, i) => (
-          <FAQRow key={item.q} q={item.q} a={item.a} isInView={isInView} index={i} />
+        {c.items.map((item, i) => (
+          <FAQRow key={i} q={item.q} a={item.a} isInView={isInView} index={i} />
         ))}
       </div>
     </section>

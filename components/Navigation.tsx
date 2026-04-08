@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
+import { content, Locale } from "@/lib/content";
 
-export default function Navigation() {
+export default function Navigation({ lang = "en" }: { lang?: Locale }) {
+  const c = content[lang].nav;
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -13,13 +15,6 @@ export default function Navigation() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const links = [
-    { label: "How It Works", href: "#how-it-works" },
-    { label: "Why Us", href: "#comparison" },
-    { label: "Reviews", href: "#testimonials" },
-    { label: "FAQ", href: "#faq" },
-  ];
 
   return (
     <>
@@ -47,7 +42,7 @@ export default function Navigation() {
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-8">
-            {links.map((link) => (
+            {c.links.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
@@ -64,7 +59,7 @@ export default function Navigation() {
               href="#form"
               className="btn-gold px-6 py-2.5 rounded-sm inline-flex items-center gap-2"
             >
-              Get My Cash Offer
+              {c.cta}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M3 7H11M7 3L11 7L7 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -95,7 +90,7 @@ export default function Navigation() {
             className="fixed inset-0 z-40 bg-obsidian-900/98 backdrop-blur-xl pt-20 px-8 md:hidden"
           >
             <div className="flex flex-col gap-6 py-8">
-              {links.map((link, i) => (
+              {c.links.map((link, i) => (
                 <motion.a
                   key={link.href}
                   href={link.href}
@@ -116,7 +111,7 @@ export default function Navigation() {
                 onClick={() => setMenuOpen(false)}
                 className="btn-gold px-8 py-4 rounded-sm text-center mt-4"
               >
-                Get My Cash Offer
+                {c.cta}
               </motion.a>
             </div>
           </motion.div>
