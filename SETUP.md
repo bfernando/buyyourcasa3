@@ -81,6 +81,26 @@ Edit the `cities` array in `components/ServiceArea.tsx` and update the copy to r
 ### Analytics & Tracking
 Add your tracking snippet to `app/layout.tsx` inside the `<head>` or use Next.js Script component for GA4, GTM, etc.
 
+### Voice Agent Voices
+If you want to use a specific ElevenLabs voice with the browser voice agent:
+
+1. Add your ElevenLabs API key in Vapi Dashboard → Integrations → ElevenLabs.
+2. Set one or both of these env vars:
+
+```bash
+NEXT_PUBLIC_VAPI_VOICE_EN_ID=<your-english-voice-id>
+NEXT_PUBLIC_VAPI_VOICE_ES_ID=<your-spanish-voice-id>
+```
+
+Optional model overrides:
+
+```bash
+NEXT_PUBLIC_VAPI_VOICE_EN_MODEL=eleven_turbo_v2_5
+NEXT_PUBLIC_VAPI_VOICE_ES_MODEL=eleven_turbo_v2_5
+```
+
+If those env vars are omitted, the app falls back to the current built-in ElevenLabs voice IDs.
+
 ---
 
 ## Tech Stack

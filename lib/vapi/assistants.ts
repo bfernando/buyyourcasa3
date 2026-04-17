@@ -19,6 +19,16 @@
 
 import type { Locale } from "@/lib/content";
 
+const DEFAULT_ELEVENLABS_VOICE_IDS = {
+  en: "EXAVITQu4vr4xnSDxMaL",
+  es: "XrExE9yKIg1WjnnlVkGX",
+} as const;
+
+const DEFAULT_ELEVENLABS_MODELS = {
+  en: "eleven_turbo_v2_5",
+  es: "eleven_turbo_v2_5",
+} as const;
+
 /**
  * Build the absolute URL that Vapi will POST function-tool calls to.
  * In production this must be the public https URL (Vercel). In local dev
@@ -30,6 +40,24 @@ function webhookUrl(): string {
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
     "http://localhost:3000";
   return `${base}/api/vapi/webhook`;
+}
+
+function voiceIdFor(lang: Locale): string {
+  const envValue =
+    lang === "es"
+      ? process.env.NEXT_PUBLIC_VAPI_VOICE_ES_ID
+      : process.env.NEXT_PUBLIC_VAPI_VOICE_EN_ID;
+
+  return envValue?.trim() || DEFAULT_ELEVENLABS_VOICE_IDS[lang];
+}
+
+function voiceModelFor(lang: Locale): string {
+  const envValue =
+    lang === "es"
+      ? process.env.NEXT_PUBLIC_VAPI_VOICE_ES_MODEL
+      : process.env.NEXT_PUBLIC_VAPI_VOICE_EN_MODEL;
+
+  return envValue?.trim() || DEFAULT_ELEVENLABS_MODELS[lang];
 }
 
 // ─── Function tool definitions ─────────────────────────────────────────────
@@ -248,8 +276,8 @@ function buildAssistant(lang: Locale) {
     // or by changing this line.
     voice: {
       provider: "11labs" as const,
-      voiceId: isEs ? "XrExE9yKIg1WjnnlVkGX" : "EXAVITQu4vr4xnSDxMaL", // ES: Matilda-ish (multi), EN: Sarah
-      model: "eleven_turbo_v2_5",
+      voiceId: voiceIdFor(lang),
+      model: voiceModelFor(lang),
       stability: 0.6,
       similarityBoost: 0.75,
     },
