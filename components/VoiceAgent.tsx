@@ -24,7 +24,7 @@
  *     of the page to anyone who wants to read more.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Vapi from "@vapi-ai/web";
 import { content, type Locale } from "@/lib/content";
@@ -48,6 +48,17 @@ type Turn = {
   partial?: boolean;
 };
 
+type LeadSummary = {
+  address?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  condition?: string;
+  timeline?: string;
+  reason?: string;
+};
+
 type Props = {
   lang?: Locale;
   /** When true, the agent renders as a fixed full-viewport overlay and
@@ -63,6 +74,25 @@ type Props = {
    *  hard-couple VoiceAgent to LeadForm/LeadFormMobile. */
   fallbackForm?: React.ReactNode;
 };
+
+function normalizeMessageText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function cleanSummaryValue(value?: string) {
+  if (!value || value === "(pending)") return undefined;
+  return value;
+}
+
+function formatSummaryEnum(
+  value: string | undefined,
+  labels: Record<string, string>,
+  fallback: string,
+) {
+  const cleanValue = cleanSummaryValue(value);
+  if (!cleanValue) return fallback;
+  return labels[cleanValue] ?? cleanValue.replace(/_/g, " ");
+}
 
 export default function VoiceAgent({
   lang = "en",
@@ -82,9 +112,13 @@ export default function VoiceAgent({
   const [capturedFirstName, setCapturedFirstName] = useState<string | null>(
     null,
   );
+  const [typedInput, setTypedInput] = useState("");
+  const [leadSummary, setLeadSummary] = useState<LeadSummary>({});
 
   const vapiRef = useRef<Vapi | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const pendingTypedMessagesRef = useRef<string[]>([]);
+  const optimisticTypedMessagesRef = useRef<string[]>([]);
 
   // ─── Body-scroll lock while the overlay is mounted ──────────────────────
   useEffect(() => {
@@ -101,6 +135,105 @@ export default function VoiceAgent({
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns]);
 
+  const flushPendingTypedMessages = useCallback(() => {
+    const vapi = vapiRef.current;
+    if (!vapi || pendingTypedMessagesRef.current.length === 0) return;
+
+    const queuedMessages = [...pendingTypedMessagesRef.current];
+    pendingTypedMessagesRef.current = [];
+    setPhase("thinking");
+
+    for (const message of queuedMessages) {
+      try {
+        vapi.send({
+          type: "add-message",
+          message: { role: "user", content: message },
+          triggerResponseEnabled: true,
+        });
+      } catch (error) {
+        console.error("[VoiceAgent] send queued typed message failed", error);
+        pendingTypedMessagesRef.current.unshift(message);
+        setPhase("error");
+        break;
+      }
+    }
+  }, []);
+
+  const syncLeadSummary = useCallback(
+    (
+      calls: Array<{
+        function?: { name?: string; arguments?: unknown };
+      }>,
+    ) => {
+      setLeadSummary((prev) => {
+        const next = { ...prev };
+
+        for (const call of calls) {
+          const raw = call.function?.arguments;
+          const name = call.function?.name;
+          let args: Record<string, unknown> = {};
+
+          try {
+            args =
+              typeof raw === "string"
+                ? ((JSON.parse(raw) as Record<string, unknown>) ?? {})
+                : ((raw as Record<string, unknown>) ?? {});
+          } catch {
+            args = {};
+          }
+
+          if (name === "save_address") {
+            const address = args.address;
+            if (typeof address === "string" && address.trim()) {
+              next.address = address.trim();
+            }
+            continue;
+          }
+
+          if (name === "save_contact") {
+            const firstName = args.firstName;
+            const lastName = args.lastName;
+            const phone = args.phone;
+            const email = args.email;
+
+            if (typeof firstName === "string" && firstName.trim()) {
+              next.firstName = firstName.trim();
+            }
+            if (typeof lastName === "string" && lastName.trim()) {
+              next.lastName = lastName.trim();
+            }
+            if (typeof phone === "string" && phone.trim()) {
+              next.phone = phone.trim();
+            }
+            if (typeof email === "string" && email.trim()) {
+              next.email = email.trim();
+            }
+            continue;
+          }
+
+          if (name === "save_details") {
+            const condition = args.condition;
+            const timeline = args.timeline;
+            const reason = args.reason;
+
+            if (typeof condition === "string" && condition.trim()) {
+              next.condition = condition.trim();
+            }
+            if (typeof timeline === "string" && timeline.trim()) {
+              next.timeline = timeline.trim();
+            }
+            if (typeof reason === "string" && reason.trim()) {
+              next.reason = reason.trim();
+            }
+          }
+        }
+
+        return next;
+      });
+    },
+    [],
+  );
+
   // ─── Vapi wire-up ────────────────────────────────────────────────────────
   const setupVapi = useCallback(() => {
     if (vapiRef.current) return vapiRef.current;
@@ -116,9 +249,15 @@ export default function VoiceAgent({
     const vapi = new Vapi(publicKey);
     vapiRef.current = vapi;
 
-    vapi.on("call-start", () => setPhase("listening"));
+    vapi.on("call-start", () => {
+      setPhase("listening");
+      flushPendingTypedMessages();
+    });
 
     vapi.on("call-end", () => {
+      pendingTypedMessagesRef.current = [];
+      optimisticTypedMessagesRef.current = [];
+
       // Slight delay so any final transcript event lands first.
       setTimeout(() => {
         setPhase("success");
@@ -163,9 +302,24 @@ export default function VoiceAgent({
         if (!text) return;
 
         setTurns((prev) => {
+          const normalizedText = normalizeMessageText(text);
+          const optimisticText = optimisticTypedMessagesRef.current[0];
           // Merge partials: if the last turn is the same role and partial,
           // replace its text; otherwise append a new turn.
           const last = prev[prev.length - 1];
+          if (
+            role === "user" &&
+            transcriptType === "final" &&
+            optimisticText &&
+            normalizeMessageText(optimisticText) === normalizedText &&
+            last &&
+            last.role === "user" &&
+            !last.partial &&
+            normalizeMessageText(last.text) === normalizedText
+          ) {
+            optimisticTypedMessagesRef.current.shift();
+            return prev;
+          }
           if (last && last.role === role && last.partial) {
             const next = [...prev];
             next[next.length - 1] = {
@@ -193,6 +347,7 @@ export default function VoiceAgent({
             function?: { name?: string; arguments?: unknown };
           }>) ||
           [];
+        syncLeadSummary(calls);
         for (const call of calls) {
           if (call.function?.name === "save_contact") {
             const raw = call.function.arguments;
@@ -214,13 +369,18 @@ export default function VoiceAgent({
     });
 
     return vapi;
-  }, [onDismiss]);
+  }, [flushPendingTypedMessages, onDismiss, syncLeadSummary]);
 
   // ─── Start the call (one-tap) ────────────────────────────────────────────
-  const startCall = useCallback(async () => {
+  const startCall = useCallback(async (initialTypedMessage?: string) => {
+    const initialMessage = normalizeMessageText(initialTypedMessage ?? "");
+
     setPhase("connecting");
-    setTurns([]);
+    setTurns(initialMessage ? [{ role: "user", text: initialMessage }] : []);
     setCapturedFirstName(null);
+    setLeadSummary({});
+    pendingTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
+    optimisticTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
 
     const vapi = setupVapi();
     if (!vapi) {
@@ -284,8 +444,102 @@ export default function VoiceAgent({
 
   const isLive =
     phase === "listening" || phase === "speaking" || phase === "thinking";
+  const showTypedComposer =
+    phase === "idle" || phase === "connecting" || isLive;
+  const typedHint = phase === "connecting" ? c.typeQueuedHint : c.typeHint;
+  const summaryValues = c.summaryValues as {
+    condition: Record<string, string>;
+    timeline: Record<string, string>;
+  };
+  const summaryRows = [
+    {
+      label: c.summaryLabels.address,
+      value: cleanSummaryValue(leadSummary.address) ?? c.summaryEmpty,
+    },
+    {
+      label: c.summaryLabels.name,
+      value:
+        cleanSummaryValue(
+          [leadSummary.firstName, leadSummary.lastName]
+            .map((part) => cleanSummaryValue(part))
+            .filter(Boolean)
+            .join(" "),
+        ) ?? c.summaryEmpty,
+    },
+    {
+      label: c.summaryLabels.phone,
+      value: cleanSummaryValue(leadSummary.phone) ?? c.summaryEmpty,
+    },
+    {
+      label: c.summaryLabels.email,
+      value: cleanSummaryValue(leadSummary.email) ?? c.summaryEmpty,
+    },
+    {
+      label: c.summaryLabels.condition,
+      value: formatSummaryEnum(
+        leadSummary.condition,
+        summaryValues.condition,
+        c.summaryEmpty,
+      ),
+    },
+    {
+      label: c.summaryLabels.timeline,
+      value: formatSummaryEnum(
+        leadSummary.timeline,
+        summaryValues.timeline,
+        c.summaryEmpty,
+      ),
+    },
+    {
+      label: c.summaryLabels.reason,
+      value: cleanSummaryValue(leadSummary.reason) ?? c.summaryEmpty,
+    },
+  ];
 
   // ─── Swap to form fallback ───────────────────────────────────────────────
+  const handleTypedSubmit = useCallback(
+    async (event?: FormEvent<HTMLFormElement>) => {
+      event?.preventDefault();
+
+      const nextMessage = normalizeMessageText(typedInput);
+      if (!nextMessage) return;
+
+      setTypedInput("");
+
+      if (isLive && vapiRef.current) {
+        optimisticTypedMessagesRef.current.push(nextMessage);
+        setTurns((prev) => [...prev, { role: "user", text: nextMessage }]);
+
+        try {
+          setPhase("thinking");
+          vapiRef.current.send({
+            type: "add-message",
+            message: { role: "user", content: nextMessage },
+            triggerResponseEnabled: true,
+          });
+        } catch (error) {
+          console.error("[VoiceAgent] send typed message failed", error);
+          setTypedInput(nextMessage);
+          setPhase("error");
+        }
+        return;
+      }
+
+      if (phase === "connecting") {
+        optimisticTypedMessagesRef.current.push(nextMessage);
+        pendingTypedMessagesRef.current.push(nextMessage);
+        setTurns((prev) => [...prev, { role: "user", text: nextMessage }]);
+        return;
+      }
+
+      await startCall(nextMessage);
+    },
+    [isLive, phase, startCall, typedInput],
+  );
+  const handleStartCall = useCallback(() => {
+    void startCall();
+  }, [startCall]);
+
   if (showFallback && fallbackForm) {
     return <>{fallbackForm}</>;
   }
@@ -336,7 +590,7 @@ export default function VoiceAgent({
       </div>
 
       {/* Main content — switches on phase */}
-      <div className="relative z-10 h-full w-full flex items-center justify-center px-6 py-20">
+      <div className="relative z-10 h-full w-full flex items-center justify-center px-6 py-20 pb-40">
         <AnimatePresence mode="wait">
           {/* ── IDLE: the tap-to-talk entry point ─────────────────────── */}
           {phase === "idle" && (
@@ -358,7 +612,7 @@ export default function VoiceAgent({
                 {c.idleSub}
               </p>
 
-              <TapToTalkButton onClick={startCall} label={c.startButton} />
+              <TapToTalkButton onClick={handleStartCall} label={c.startButton} />
 
               {/* Fallback link */}
               {fallbackForm && (
@@ -483,7 +737,7 @@ export default function VoiceAgent({
                 {c.micBlockedSub}
               </p>
               <div className="flex flex-col items-center gap-4">
-                <button onClick={startCall} className="btn-gold px-8 py-3.5 rounded-sm text-sm">
+                <button onClick={handleStartCall} className="btn-gold px-8 py-3.5 rounded-sm text-sm">
                   {c.micBlockedRetry}
                 </button>
                 {fallbackForm && (
@@ -514,7 +768,7 @@ export default function VoiceAgent({
                 {c.errorSub}
               </p>
               <div className="flex flex-col items-center gap-4">
-                <button onClick={startCall} className="btn-gold px-8 py-3.5 rounded-sm text-sm">
+                <button onClick={handleStartCall} className="btn-gold px-8 py-3.5 rounded-sm text-sm">
                   {c.errorRetry}
                 </button>
                 {fallbackForm && (
@@ -537,7 +791,7 @@ export default function VoiceAgent({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5 }}
-              className="max-w-md w-full text-center flex flex-col items-center"
+              className="max-w-3xl w-full text-center flex flex-col items-center"
             >
               <div className="w-20 h-20 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mb-7">
                 <motion.svg
@@ -568,6 +822,26 @@ export default function VoiceAgent({
               <p className="text-cream/55 font-body text-base leading-relaxed mb-7 max-w-sm">
                 {c.successSub}
               </p>
+              <div className="w-full max-w-2xl rounded-2xl border border-surface-border bg-surface-hover/40 px-5 py-5 text-left mb-7">
+                <p className="text-[11px] font-body uppercase tracking-[0.25em] text-cream/45 mb-4">
+                  {c.summaryTitle}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {summaryRows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="rounded-xl border border-surface-border bg-obsidian-900/55 px-4 py-3"
+                    >
+                      <p className="text-[11px] font-body uppercase tracking-[0.2em] text-cream/35 mb-1">
+                        {row.label}
+                      </p>
+                      <p className="text-sm font-body leading-relaxed text-cream/85">
+                        {row.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="flex flex-wrap justify-center gap-3 text-xs font-body text-cream/30 uppercase tracking-widest">
                 {c.successMicro.map((m, i) => (
                   <span key={m} className="flex items-center gap-3">
@@ -582,6 +856,35 @@ export default function VoiceAgent({
           )}
         </AnimatePresence>
       </div>
+
+      {showTypedComposer && (
+        <div className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-6 lg:px-10">
+          <div className="mx-auto max-w-3xl rounded-2xl border border-surface-border bg-obsidian-900/88 shadow-2xl shadow-black/30 backdrop-blur-xl">
+            <div className="border-b border-surface-border px-4 py-3">
+              <p className="text-center text-[11px] font-body uppercase tracking-[0.22em] text-cream/45">
+                {typedHint}
+              </p>
+            </div>
+            <form onSubmit={handleTypedSubmit} className="flex gap-3 p-3">
+              <input
+                value={typedInput}
+                onChange={(event) => setTypedInput(event.target.value)}
+                placeholder={c.typePlaceholder}
+                aria-label={c.typePlaceholder}
+                className="min-w-0 flex-1 rounded-xl border border-surface-border bg-obsidian-900 px-4 py-3 text-sm font-body text-cream placeholder:text-cream/30 focus:border-gold/50 focus:outline-none"
+                autoComplete="off"
+              />
+              <button
+                type="submit"
+                disabled={!typedInput.trim()}
+                className="shrink-0 rounded-xl bg-gold px-5 py-3 text-xs font-body uppercase tracking-[0.22em] text-obsidian-900 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {c.typeSend}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
