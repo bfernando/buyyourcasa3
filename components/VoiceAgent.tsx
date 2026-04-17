@@ -109,6 +109,7 @@ export default function VoiceAgent({
   const [muted, setMuted] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [hasStartedConversation, setHasStartedConversation] = useState(false);
   const [capturedFirstName, setCapturedFirstName] = useState<string | null>(
     null,
   );
@@ -375,6 +376,7 @@ export default function VoiceAgent({
   const startCall = useCallback(async (initialTypedMessage?: string) => {
     const initialMessage = normalizeMessageText(initialTypedMessage ?? "");
 
+    setHasStartedConversation(true);
     setPhase("connecting");
     setTurns(initialMessage ? [{ role: "user", text: initialMessage }] : []);
     setCapturedFirstName(null);
@@ -445,7 +447,7 @@ export default function VoiceAgent({
   const isLive =
     phase === "listening" || phase === "speaking" || phase === "thinking";
   const showTypedComposer =
-    phase === "idle" || phase === "connecting" || isLive;
+    hasStartedConversation && phase !== "success";
   const typedHint = phase === "connecting" ? c.typeQueuedHint : c.typeHint;
   const summaryValues = c.summaryValues as {
     condition: Record<string, string>;
