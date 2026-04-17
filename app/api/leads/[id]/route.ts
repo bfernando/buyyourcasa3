@@ -16,6 +16,8 @@ export async function PATCH(
       "phone", "firstName", "lastName", "email",
       "condition", "timeline", "reason",
       "step", "completed",
+      // Voice agent fields (populated by /api/vapi/webhook)
+      "callId", "callDurationSec", "recordingUrl", "transcript",
     ];
     for (const key of allowed) {
       if (body[key] !== undefined && body[key] !== null && body[key] !== "") {

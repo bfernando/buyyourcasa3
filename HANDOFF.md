@@ -1,11 +1,189 @@
 # BuyYourCasa — Project Handoff Document
 
-**Last updated:** April 2026  
-**Live URL:** https://buyyourcasa3.vercel.app  
-**GitHub:** https://github.com/bfernando/buyyourcasa3  
+**Last updated:** April 2026 (voice agent cutover)
+**Live URL:** https://buyyourcasa3.vercel.app
+**GitHub:** https://github.com/bfernando/buyyourcasa3
 **Vercel project:** bradley-fernandos-projects/buyyourcasa3
 
+> **Recent change (April 2026):** The funnel was converted from a 4-step form to a browser voice agent (Vapi + WebRTC). The form still exists as a fallback, but the primary path is now voice. See **Section 0: Voice Agent Cutover** below for everything specific to the voice layer — it supersedes the form-only funnel descriptions in Sections 2–5 where they conflict.
+
 ---
+
+## 0. Voice Agent Cutover (April 2026)
+
+
+**Status:** Code complete. Not yet deployed. Needs `npm install`, DB migration, and Vercel env vars to go live.
+
+---
+
+## What changed, in one paragraph
+
+The funnel used to be a 4-step form on `/`, `/m`, `/es`, `/es/m`. It now loads a full-screen voice agent shell (Vapi + WebRTC) on top of the existing SEO content. One tap, the assistant speaks, the transcript types live on screen, and the four fields we used to collect through form steps (address, contact, property condition/timeline/reason) are now captured as Vapi function tool calls into the same `leads` table. The old form is still rendered underneath as the SEO payload and is shown as a fallback if the user taps "Prefer to type?" or denies mic permission. English assistant on `/` + `/m`, Spanish-native assistant on `/es` + `/es/m` (not a translation — separate system prompt, separate voice, Deepgram language flag set).
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Browser                                                    │
+│  ┌───────────────────┐      ┌──────────────────────┐        │
+│  │  /, /m, /es, /es/m│──────│ <VoiceAgent lang=…/> │        │
+│  └───────────────────┘      └──────────┬───────────┘        │
+│                                        │                    │
+│                                  @vapi-ai/web               │
+│                                 (WebRTC / Daily)            │
+└────────────────────────────────────────┼────────────────────┘
+                                         │
+                              ┌──────────▼──────────┐
+                              │     Vapi cloud      │
+                              │  (STT + LLM + TTS)  │
+                              └──────────┬──────────┘
+                                         │ server webhooks
+                                         │ (tool-calls, end-of-call-report)
+                              ┌──────────▼──────────┐
+                              │ /api/vapi/webhook   │
+                              │  (Next.js route)    │
+                              └──────────┬──────────┘
+                                         │
+                                   Prisma → Postgres
+                                   (leads table)
+```
+
+**No assistant IDs in env.** Assistant configs (voice, model, tools, system prompt) live inline in `lib/vapi/assistants.ts`. The browser SDK receives the full config at call time, so the repo is the single source of truth — no drift between the Vapi dashboard and code.
+
+---
+
+## Files touched
+
+### New
+- `lib/vapi/assistants.ts` — inline `assistantEN` and `assistantES` configs, plus `assistantFor(lang)` router. Defines the four function tools (`save_address`, `save_contact`, `save_details`, `complete_lead`) that Vapi will call during the conversation. Deepgram nova-3 transcriber, OpenAI gpt-4o-mini at 0.6 temperature, 11Labs voices (Sarah EN, Matilda ES), `eleven_turbo_v2_5`.
+- `components/VoiceAgent.tsx` — full-screen overlay component. State machine: `idle → connecting → listening ↔ speaking → success`, plus `mic-blocked` and `error` branches. Renders tap-to-talk button, pulsing waveform that reacts to `volume-level` events, chat-style transcript bubbles (user right, assistant left) that update live from partial + final transcript events, mute/end/fallback controls. Body scroll is locked while mounted (SEO content stays in DOM but isn't scrollable).
+- `app/api/vapi/webhook/route.ts` — POST handler that verifies the `x-vapi-secret` (or `Authorization: Bearer`) header against `VAPI_WEBHOOK_SECRET`, then routes:
+  - `tool-calls` → dispatches to `handleSaveAddress/Contact/Details/completeLead`, upserts a `leads` row keyed by `callId`. Returns `{ results: [{ toolCallId, result }] }` (Vapi's expected shape).
+  - `end-of-call-report` → writes `callDurationSec`, `recordingUrl`, `transcript` (JSON blob of the message list) onto the same row.
+- `app/es/layout.tsx` — extracted the Spanish `<Metadata>` here so `app/es/page.tsx` could become a client component (needs `useState` for overlay dismissal).
+
+### Modified
+- `app/page.tsx`, `app/m/page.tsx`, `app/es/page.tsx`, `app/es/m/page.tsx` — each now a client component that renders the original funnel inside `<main>` and mounts `<VoiceAgent>` as a sibling overlay. The existing form (`<LeadForm>` / `<LeadFormMobile>`) is passed as `fallbackForm` so the "Prefer to type?" button reveals it in place without re-mounting.
+- `app/api/leads/[id]/route.ts` — PATCH now accepts the four new voice fields (`callId`, `callDurationSec`, `recordingUrl`, `transcript`) in the allow-list.
+- `lib/content.ts` — added a `voice: {...}` block to both `en` and `es` content objects. ~20 strings each (idle state, listening/speaking labels, mic-blocked copy, success copy, trust row, fallback link).
+- `prisma/schema.prisma` — added four nullable columns to the `Lead` model: `callId String?`, `callDurationSec Int?`, `recordingUrl String?`, `transcript Json?`. Updated the `source` comment to include `"voice-en" | "voice-es"`.
+- `package.json` — added `"@vapi-ai/web": "^2.5.2"` to dependencies.
+
+### Env
+- `.env.local` — exists with Vapi public key, private key, webhook secret, and `NEXT_PUBLIC_SITE_URL=http://localhost:3000` (change to the ngrok URL for local Vapi testing). **Not committed** (it's already in `.gitignore`).
+
+---
+
+## What's left before it ships
+
+### 1. Finish the local install
+Sandbox couldn't complete it:
+```bash
+npm install
+npx prisma generate
+```
+
+### 2. Typecheck (should be clean)
+```bash
+npx tsc --noEmit
+```
+Expected: zero errors. If you see "Cannot find module 'next/server'" or "PrismaClient has no exported member" errors, the install or prisma generate didn't finish — re-run step 1.
+
+### 3. Create the migration
+```bash
+npx prisma migrate dev --name add_voice_fields
+```
+Writes `prisma/migrations/<timestamp>_add_voice_fields/migration.sql`. Commit that folder.
+
+On Vercel deploy, `prisma migrate deploy` runs through the `build` script (`"build": "prisma generate && next build"`). If you want migration-on-deploy, change that to `"build": "prisma migrate deploy && prisma generate && next build"` or run it manually against the prod DB once.
+
+### 4. Push env vars to Vercel
+
+Four vars, Production + Preview environments:
+
+| Name | Value | Public? |
+|---|---|---|
+| `NEXT_PUBLIC_VAPI_PUBLIC_KEY` | `5106b5be-7a0e-45ac-8883-f3b186a35fa7` | Yes — ships in browser bundle |
+| `VAPI_PRIVATE_KEY` | `a98ac2db-a490-422f-bf5b-02d63c92a087` | No — server only |
+| `VAPI_WEBHOOK_SECRET` | `2fbe3d680373b62445b95e38ca647b137cf0a07bcc8bbf9c7508009b71e604cc` | No — server only |
+| `NEXT_PUBLIC_SITE_URL` | `https://buyyourcasa3.vercel.app` | Yes — used to build webhook URLs |
+
+CLI version:
+```bash
+npx vercel link
+npx vercel env add NEXT_PUBLIC_VAPI_PUBLIC_KEY production
+npx vercel env add VAPI_PRIVATE_KEY production
+npx vercel env add VAPI_WEBHOOK_SECRET production
+npx vercel env add NEXT_PUBLIC_SITE_URL production
+# Then repeat for preview:
+npx vercel env add NEXT_PUBLIC_VAPI_PUBLIC_KEY preview
+# ...
+```
+
+**`NEXT_PUBLIC_SITE_URL` is the load-bearing one.** `lib/vapi/assistants.ts` calls `webhookUrl()` at module evaluation time to build the absolute URL for each tool's `server.url`. If it's pointing at `localhost`, Vapi's servers can't reach your tools and you'll see the assistant talk but nothing saves.
+
+### 5. Vapi dashboard: server URL secret
+Log into the Vapi dashboard → Org Settings → Server URL. Paste the `VAPI_WEBHOOK_SECRET` value into the secret field so Vapi attaches it as `x-vapi-secret` on every outbound webhook. (Alternatively, the inline assistant config sends `serverUrlSecret` per call — this is already wired in `lib/vapi/assistants.ts` via `server.secret`, but the dashboard fallback is belt-and-suspenders.)
+
+### 6. Local testing before deploy
+Vapi can't reach `localhost`. Use a tunnel:
+```bash
+# terminal 1
+npm run dev
+# terminal 2
+ngrok http 3000
+# copy the https URL, then in .env.local:
+# NEXT_PUBLIC_SITE_URL=https://<subdomain>.ngrok-free.app
+# (restart npm run dev so the new env var is picked up)
+```
+
+### 7. Smoke test
+1. Open `/` in Chrome. The voice overlay should cover the page.
+2. Tap the gold "Start talking" button. Browser prompts for mic. Allow.
+3. Sarah (EN) greets you. Say: "123 Main Street, Dallas, Texas." Wait ~1s. You should see the transcript update live.
+4. Check `leads` table: a new row should exist with `callId`, `address`, `source="voice-en"`, `step=1`.
+5. Continue the convo through contact and details. Each step should update the same row.
+6. Say "that's all" / let it hang up. Row should end with `completed=true`, `callDurationSec` set, and `transcript` populated as JSON.
+7. Repeat on `/es` — should hear Matilda (ES) and get `source="voice-es"`.
+
+---
+
+## Known non-issues
+
+- **50 files show as modified in `git status`.** Most are just filemode changes (100644 → 100755) from the Windows mount. Run `git config core.fileMode false` in PowerShell before committing, or commit paths explicitly (see commit command below).
+- **Sandbox couldn't complete `npm install`.** The 45s bash timeout killed it partway. Node_modules is present but missing the `next` type declarations and the `.prisma/client` output. This is purely a sandbox limitation — a fresh `npm install` on your laptop will complete cleanly and `tsc --noEmit` will go clean.
+- **We call `vapi.start(assistantFor(lang))` with a type assertion.** The `@vapi-ai/web` SDK's start signature wants the first arg as either a string (assistant ID) or `CreateAssistantDTO`. Our inline config is structurally identical to `CreateAssistantDTO` but typed more loosely, so there's one `as any` cast in `VoiceAgent.tsx` to bridge it. Worth revisiting if the SDK tightens its types in a future release.
+
+---
+
+## Where to poke if something misbehaves
+
+| Symptom | First place to look |
+|---|---|
+| Overlay doesn't show | `<VoiceAgent>` prop `shellMode` defaults to true; confirm parent page passes it. Check `overlayDismissed` state isn't stuck true. |
+| Mic prompt doesn't appear | Browser blocked it silently — check site settings. The `mic-blocked` branch of the state machine nudges the user but can't force the prompt to re-appear (browser policy). |
+| Assistant talks but nothing saves to DB | `NEXT_PUBLIC_SITE_URL` is wrong or Vapi can't reach it. Hit `https://<your-url>/api/vapi/webhook` in a browser — should return `{"ok":true,"service":"vapi-webhook"}`. |
+| Webhook returns 401 | `VAPI_WEBHOOK_SECRET` mismatch between `.env` and Vapi dashboard, or the header isn't being sent (check request logs). |
+| Partial transcript flickers | Expected — we merge `transcriptType: "partial"` events into the current turn and commit on `final`. See `onMessage` in `VoiceAgent.tsx`. |
+| Spanish assistant speaks English | Check `assistantFor(lang)` is getting `"es"` — page component must pass `lang="es"` to `<VoiceAgent>`. Deepgram `language: "es"` must also be set in the assistant config. |
+| Call drops at ~10 min | `maxDurationSeconds: 600` in the assistant config. Raise if needed. |
+
+---
+
+## Rollback plan
+
+If voice agent misbehaves in production and you need the form back as the primary path, flip the overlay off in all four page components by hard-coding `overlayDismissed` to `true`. The underlying `<LeadForm>` / `<LeadFormMobile>` still works unchanged — the voice layer was strictly additive to the DOM.
+
+Faster: revert the single commit that introduces `<VoiceAgent>` into the four page files. The schema change (four nullable columns on `leads`) is additive and safe to leave in place.
+
+
+---
+
+## Pre-voice-cutover project reference
+
+*The rest of this document describes the original form-based funnel architecture. Most of it still applies — routing, tech stack, design system, database, deployment. Sections that are now superseded by the voice cutover (Section 2 form funnel, Section 4 form submission flow) are noted inline.*
 
 ## 1. What Was Built
 

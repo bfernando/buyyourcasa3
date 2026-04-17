@@ -14,7 +14,7 @@ model Lead {
 
   // Step 1 — captured immediately on first action
   address   String
-  source    String   @default("desktop") // "desktop" | "mobile"
+  source    String   @default("desktop") // "desktop" | "mobile" | "voice-en" | "voice-es"
   step      Int      @default(1)         // highest step reached
   completed Boolean  @default(false)
 
@@ -28,6 +28,13 @@ model Lead {
   condition String?
   timeline  String?
   reason    String?
+
+  // Voice agent (Vapi) call artifacts — nullable; only populated when the
+  // lead originated from the browser voice agent (source starts with "voice-").
+  callId          String?
+  callDurationSec Int?
+  recordingUrl    String?
+  transcript      Json?
 
   @@map("leads")
 }
