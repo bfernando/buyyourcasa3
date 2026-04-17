@@ -91,13 +91,17 @@ npx tsc --noEmit
 ```
 Expected: zero errors. If you see "Cannot find module 'next/server'" or "PrismaClient has no exported member" errors, the install or prisma generate didn't finish — re-run step 1.
 
-### 3. Create the migration
-```bash
-npx prisma migrate dev --name add_voice_fields
-```
-Writes `prisma/migrations/<timestamp>_add_voice_fields/migration.sql`. Commit that folder.
+### 3. Create the migration safely
+This repo currently has no committed `prisma/migrations` history. Do **not** point `npx prisma migrate dev` at a production database. Prisma documents `migrate dev` as a development-only command and recommends baselining an existing database before using `migrate deploy`.
 
-On Vercel deploy, `prisma migrate deploy` runs through the `build` script (`"build": "prisma generate && next build"`). If you want migration-on-deploy, change that to `"build": "prisma migrate deploy && prisma generate && next build"` or run it manually against the prod DB once.
+If you want Prisma Migrate in this repo going forward:
+1. Baseline the existing pre-voice schema into `prisma/migrations/0_init`.
+2. Generate `add_voice_fields` from a **non-production** database or branch that matches the current live schema.
+3. Commit both the baseline migration and the new `add_voice_fields` migration.
+
+If you only need to add the four nullable voice columns to the current hosted database once, the pragmatic one-off is `prisma db push` or a manual `ALTER TABLE` instead of trying to bootstrap migration history against production.
+
+Current `package.json` build script is `"build": "prisma generate && next build"`. It does **not** run migrations today. After real migration files exist, change it to `"build": "prisma migrate deploy && prisma generate && next build"` if you want Vercel to apply pending migrations automatically.
 
 ### 4. Push env vars to Vercel
 
@@ -105,9 +109,9 @@ Four vars, Production + Preview environments:
 
 | Name | Value | Public? |
 |---|---|---|
-| `NEXT_PUBLIC_VAPI_PUBLIC_KEY` | `5106b5be-7a0e-45ac-8883-f3b186a35fa7` | Yes — ships in browser bundle |
-| `VAPI_PRIVATE_KEY` | `a98ac2db-a490-422f-bf5b-02d63c92a087` | No — server only |
-| `VAPI_WEBHOOK_SECRET` | `2fbe3d680373b62445b95e38ca647b137cf0a07bcc8bbf9c7508009b71e604cc` | No — server only |
+| `NEXT_PUBLIC_VAPI_PUBLIC_KEY` | Set from your local `.env.local` / Vercel env | Yes — ships in browser bundle |
+| `VAPI_PRIVATE_KEY` | Set from your local `.env.local` / Vercel env | No — server only |
+| `VAPI_WEBHOOK_SECRET` | Set from your local `.env.local` / Vercel env | No — server only |
 | `NEXT_PUBLIC_SITE_URL` | `https://buyyourcasa3.vercel.app` | Yes — used to build webhook URLs |
 
 CLI version:
@@ -123,6 +127,7 @@ npx vercel env add NEXT_PUBLIC_VAPI_PUBLIC_KEY preview
 ```
 
 **`NEXT_PUBLIC_SITE_URL` is the load-bearing one.** `lib/vapi/assistants.ts` calls `webhookUrl()` at module evaluation time to build the absolute URL for each tool's `server.url`. If it's pointing at `localhost`, Vapi's servers can't reach your tools and you'll see the assistant talk but nothing saves.
+Do not store live secrets in this handoff document. Rotate any credentials that were previously pasted here.
 
 ### 5. Vapi dashboard: server URL secret
 Log into the Vapi dashboard → Org Settings → Server URL. Paste the `VAPI_WEBHOOK_SECRET` value into the secret field so Vapi attaches it as `x-vapi-secret` on every outbound webhook. (Alternatively, the inline assistant config sends `serverUrlSecret` per call — this is already wired in `lib/vapi/assistants.ts` via `server.secret`, but the dashboard fallback is belt-and-suspenders.)
