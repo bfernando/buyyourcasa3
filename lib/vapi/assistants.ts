@@ -26,7 +26,7 @@ const DEFAULT_ELEVENLABS_VOICE_IDS = {
 
 const DEFAULT_ELEVENLABS_MODELS = {
   en: "eleven_turbo_v2_5",
-  es: "eleven_turbo_v2_5",
+  es: "eleven_multilingual_v2",
 } as const;
 
 /**
