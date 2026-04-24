@@ -120,6 +120,16 @@ export default function VoiceAgent({
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const pendingTypedMessagesRef = useRef<string[]>([]);
   const optimisticTypedMessagesRef = useRef<string[]>([]);
+  const callEndedReasonRef = useRef<string | null>(null);
+  const leadCompletedRef = useRef(false);
+  const manualStopRef = useRef(false);
+  const handledCallEndRef = useRef(false);
+  const successDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const callEndFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // ─── Body-scroll lock while the overlay is mounted ──────────────────────
   useEffect(() => {
@@ -159,6 +169,59 @@ export default function VoiceAgent({
       }
     }
   }, []);
+
+  const clearCallTimers = useCallback(() => {
+    if (successDismissTimeoutRef.current) {
+      clearTimeout(successDismissTimeoutRef.current);
+      successDismissTimeoutRef.current = null;
+    }
+
+    if (callEndFallbackTimeoutRef.current) {
+      clearTimeout(callEndFallbackTimeoutRef.current);
+      callEndFallbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  const finishCall = useCallback(
+    (endedReason?: string) => {
+      if (handledCallEndRef.current) return;
+      handledCallEndRef.current = true;
+
+      if (callEndFallbackTimeoutRef.current) {
+        clearTimeout(callEndFallbackTimeoutRef.current);
+        callEndFallbackTimeoutRef.current = null;
+      }
+
+      pendingTypedMessagesRef.current = [];
+      optimisticTypedMessagesRef.current = [];
+
+      const reason = endedReason ?? callEndedReasonRef.current ?? undefined;
+
+      if (reason === "customer-did-not-give-microphone-permission") {
+        setPhase("mic-blocked");
+        return;
+      }
+
+      if (leadCompletedRef.current) {
+        setPhase("success");
+        successDismissTimeoutRef.current = setTimeout(() => {
+          setDismissed(true);
+          onDismiss?.();
+        }, 5000);
+        return;
+      }
+
+      if (manualStopRef.current || reason === "customer-ended-call") {
+        setPhase("idle");
+        setHasStartedConversation(false);
+        setTurns([]);
+        return;
+      }
+
+      setPhase("error");
+    },
+    [onDismiss],
+  );
 
   const syncLeadSummary = useCallback(
     (
@@ -256,19 +319,12 @@ export default function VoiceAgent({
     });
 
     vapi.on("call-end", () => {
-      pendingTypedMessagesRef.current = [];
-      optimisticTypedMessagesRef.current = [];
-
-      // Slight delay so any final transcript event lands first.
-      setTimeout(() => {
-        setPhase("success");
-        // Auto-dismiss 5s after success so the user lands on the page below
-        // without needing another click.
-        setTimeout(() => {
-          setDismissed(true);
-          onDismiss?.();
-        }, 5000);
-      }, 200);
+      callEndFallbackTimeoutRef.current = setTimeout(() => {
+        finishCall(
+          callEndedReasonRef.current ??
+            (manualStopRef.current ? "customer-ended-call" : undefined),
+        );
+      }, 250);
     });
 
     vapi.on("speech-start", () => setPhase("speaking"));
@@ -292,6 +348,21 @@ export default function VoiceAgent({
     });
 
     vapi.on("message", (msg: Record<string, unknown>) => {
+      if (msg.type === "status-update") {
+        const status = msg.status as string | undefined;
+        const endedReason =
+          typeof msg.endedReason === "string" ? msg.endedReason : undefined;
+
+        if (endedReason) {
+          callEndedReasonRef.current = endedReason;
+        }
+
+        if (status === "ended") {
+          finishCall(endedReason);
+        }
+        return;
+      }
+
       // Live transcript streaming — render on screen in sync with audio.
       if (msg.type === "transcript") {
         const role = msg.role as "user" | "assistant";
@@ -350,6 +421,10 @@ export default function VoiceAgent({
           [];
         syncLeadSummary(calls);
         for (const call of calls) {
+          if (call.function?.name === "complete_lead") {
+            leadCompletedRef.current = true;
+          }
+
           if (call.function?.name === "save_contact") {
             const raw = call.function.arguments;
             try {
@@ -370,12 +445,17 @@ export default function VoiceAgent({
     });
 
     return vapi;
-  }, [flushPendingTypedMessages, onDismiss, syncLeadSummary]);
+  }, [finishCall, flushPendingTypedMessages, syncLeadSummary]);
 
   // ─── Start the call (one-tap) ────────────────────────────────────────────
   const startCall = useCallback(async (initialTypedMessage?: string) => {
     const initialMessage = normalizeMessageText(initialTypedMessage ?? "");
 
+    clearCallTimers();
+    callEndedReasonRef.current = null;
+    leadCompletedRef.current = false;
+    manualStopRef.current = false;
+    handledCallEndRef.current = false;
     setHasStartedConversation(true);
     setPhase("connecting");
     setTurns(initialMessage ? [{ role: "user", text: initialMessage }] : []);
@@ -406,10 +486,11 @@ export default function VoiceAgent({
         setPhase("error");
       }
     }
-  }, [setupVapi, lang]);
+  }, [clearCallTimers, setupVapi, lang]);
 
   // ─── Stop the call manually ──────────────────────────────────────────────
   const endCall = useCallback(() => {
+    manualStopRef.current = true;
     vapiRef.current?.stop();
   }, []);
 
@@ -424,9 +505,10 @@ export default function VoiceAgent({
   // ─── Cleanup on unmount ──────────────────────────────────────────────────
   useEffect(() => {
     return () => {
+      clearCallTimers();
       vapiRef.current?.stop();
     };
-  }, []);
+  }, [clearCallTimers]);
 
   // ─── Derived UI state ────────────────────────────────────────────────────
   const statusLabel = (() => {

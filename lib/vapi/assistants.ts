@@ -263,7 +263,7 @@ function buildAssistant(lang: Locale) {
     transcriber: {
       provider: "deepgram" as const,
       model: "nova-3",
-      language: isEs ? "es" : "en-US",
+      language: isEs ? "multi" : "en-US",
     },
 
     // ── Model: OpenAI GPT-4o-mini — fast, cheap, good tool-calling
