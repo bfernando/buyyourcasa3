@@ -101,6 +101,34 @@ NEXT_PUBLIC_VAPI_VOICE_ES_MODEL=eleven_turbo_v2_5
 
 If those env vars are omitted, the app falls back to the current built-in ElevenLabs voice IDs.
 
+### Lead Email Notifications
+If you want an internal email alert whenever someone completes the funnel:
+
+1. Add the Resend integration from the Vercel Marketplace. This creates `RESEND_API_KEY` on the project automatically.
+2. Add these env vars in Vercel:
+
+```bash
+LEAD_ALERT_TO=<your-inbox@example.com>
+LEAD_ALERT_FROM=BuyYourCasa Leads <onboarding@resend.dev>
+```
+
+The app sends one internal alert when a lead transitions to `completed=true`, across both the form and voice funnels.
+
+When you're ready to use a custom sender instead of `onboarding@resend.dev`, verify a Resend sending domain first. Use a subdomain like `send.buyyour.casa` so you do not disturb any existing root-domain mail setup.
+
+If `buyyour.casa` DNS is managed in Bluehost, add the Resend records in Bluehost:
+
+1. Log in to Bluehost.
+2. Open `Domains`.
+3. Select `buyyour.casa`.
+4. Open the `DNS` tab.
+5. In `Manage Advanced DNS Records`, add the exact MX/TXT/CNAME records Resend gives you for the sending domain or subdomain.
+6. After the records propagate, switch `LEAD_ALERT_FROM` to your verified sender, for example:
+
+```bash
+LEAD_ALERT_FROM=BuyYourCasa Leads <alerts@send.buyyour.casa>
+```
+
 ---
 
 ## Tech Stack

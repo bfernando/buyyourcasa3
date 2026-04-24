@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
 
 // PATCH /api/leads/:id — progressively update a lead as they complete each step
 export async function PATCH(
@@ -9,6 +10,13 @@ export async function PATCH(
   try {
     const body = await req.json();
     const { id } = params;
+    const existingLead = await prisma.lead.findUnique({
+      where: { id },
+    });
+
+    if (!existingLead) {
+      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    }
 
     // Strip undefined values so we don't overwrite existing data with nulls
     const data: Record<string, unknown> = {};
@@ -29,6 +37,10 @@ export async function PATCH(
       where: { id },
       data,
     });
+
+    if (!existingLead.completed && lead.completed) {
+      await sendLeadCompletionAlert(lead);
+    }
 
     return NextResponse.json(lead);
   } catch (err) {
