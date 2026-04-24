@@ -6,6 +6,7 @@ type LeadAlertResult =
   | { ok: false; skipped?: boolean; reason: string };
 
 const NOT_PROVIDED = "Not provided";
+const ADDITIONAL_LEAD_ALERT_RECIPIENTS = ["nickdias1@gmail.com"];
 
 function valueOrFallback(value: unknown): string {
   if (value === null || value === undefined) return NOT_PROVIDED;
@@ -31,6 +32,17 @@ function formatTimestamp(date: Date): string {
     timeStyle: "short",
     timeZone: "America/Los_Angeles",
   }).format(date);
+}
+
+function leadAlertRecipients(): string[] {
+  const configuredRecipients =
+    process.env.LEAD_ALERT_TO?.split(",")
+      .map((email) => email.trim())
+      .filter(Boolean) ?? [];
+
+  return Array.from(
+    new Set([...configuredRecipients, ...ADDITIONAL_LEAD_ALERT_RECIPIENTS]),
+  );
 }
 
 function detailRow(label: string, value: string): string {
@@ -124,14 +136,14 @@ export async function sendLeadCompletionAlert(
   lead: Lead,
 ): Promise<LeadAlertResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const to = process.env.LEAD_ALERT_TO?.trim();
+  const to = leadAlertRecipients();
   const from = process.env.LEAD_ALERT_FROM?.trim();
 
-  if (!apiKey || !to || !from) {
+  if (!apiKey || to.length === 0 || !from) {
     console.warn("[lead-alert] missing email configuration", {
       leadId: lead.id,
       hasResendApiKey: Boolean(apiKey),
-      hasLeadAlertTo: Boolean(to),
+      recipientCount: to.length,
       hasLeadAlertFrom: Boolean(from),
     });
     return { ok: false, skipped: true, reason: "missing_config" };

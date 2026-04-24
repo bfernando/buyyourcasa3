@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
+import { sendLeadCompletionSmsAlert } from "@/lib/sms/lead-alert";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 // Loosely typed — Vapi's payload shape is large and we only read a few fields.
@@ -207,6 +208,7 @@ async function handleCompleteLead(callId: string, source: string) {
 
   if (!lead.completed && updatedLead.completed) {
     await sendLeadCompletionAlert(updatedLead);
+    await sendLeadCompletionSmsAlert(updatedLead);
   }
 
   return { ok: true, leadId: lead.id };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
+import { sendLeadCompletionSmsAlert } from "@/lib/sms/lead-alert";
 
 // PATCH /api/leads/:id — progressively update a lead as they complete each step
 export async function PATCH(
@@ -40,6 +41,7 @@ export async function PATCH(
 
     if (!existingLead.completed && lead.completed) {
       await sendLeadCompletionAlert(lead);
+      await sendLeadCompletionSmsAlert(lead);
     }
 
     return NextResponse.json(lead);
