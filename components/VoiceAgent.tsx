@@ -124,10 +124,18 @@ function isAssistantFinalFarewell(value: string) {
   const text = normalizedForIntent(value);
 
   return (
-    /\b(you'?re all set|you are all set|within 24 hours|have a great day|goodbye)\b/i.test(
-      text,
-    ) ||
-    /\b(todo listo|dentro de 24 horas|hasta luego|que tengas buen dia)\b/i.test(
+    isAssistantCompletedFarewell(value) ||
+    /\b(have a great day|goodbye)\b/i.test(text) ||
+    /\b(hasta luego|que tengas buen dia)\b/i.test(text)
+  );
+}
+
+function isAssistantCompletedFarewell(value: string) {
+  const text = normalizedForIntent(value);
+
+  return (
+    /\b(you'?re all set|you are all set|within 24 hours)\b/i.test(text) ||
+    /\b(todo listo|dentro de 24 horas)\b/i.test(
       text,
     )
   );
@@ -183,6 +191,7 @@ export default function VoiceAgent({
   const handledCallEndRef = useRef(false);
   const assistantOfferedClosingRef = useRef(false);
   const assistantFinalFarewellRef = useRef(false);
+  const assistantCompletedFarewellRef = useRef(false);
   const successDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -264,7 +273,7 @@ export default function VoiceAgent({
         return;
       }
 
-      if (leadCompletedRef.current) {
+      if (leadCompletedRef.current || assistantCompletedFarewellRef.current) {
         setPhase("success");
         successDismissTimeoutRef.current = setTimeout(() => {
           setDismissed(true);
@@ -460,6 +469,10 @@ export default function VoiceAgent({
               assistantOfferedClosingRef.current = true;
             }
 
+            if (isAssistantCompletedFarewell(text)) {
+              assistantCompletedFarewellRef.current = true;
+            }
+
             if (isAssistantFinalFarewell(text)) {
               assistantFinalFarewellRef.current = true;
             }
@@ -568,6 +581,7 @@ export default function VoiceAgent({
     handledCallEndRef.current = false;
     assistantOfferedClosingRef.current = false;
     assistantFinalFarewellRef.current = false;
+    assistantCompletedFarewellRef.current = false;
     voiceLeadEventIdRef.current = createMetaEventId(`lead_voice_${lang}`);
     setHasStartedConversation(true);
     setPhase("connecting");
