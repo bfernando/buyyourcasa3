@@ -321,7 +321,7 @@ function buildAssistant(lang: Locale) {
 
     // ── Durations & behavior
     maxDurationSeconds: 600,
-    silenceTimeoutSeconds: 20,
+    silenceTimeoutSeconds: 60,
     backgroundSound: "off" as const,
 
     // ── Messages we care about on the client (for live transcript rendering)

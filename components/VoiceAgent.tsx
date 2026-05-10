@@ -256,7 +256,10 @@ export default function VoiceAgent({
 
       const reason = endedReason ?? callEndedReasonRef.current ?? undefined;
 
-      if (reason === "customer-did-not-give-microphone-permission") {
+      if (
+        reason === "customer-did-not-give-microphone-permission" ||
+        reason === "call.in-progress.error-assistant-did-not-receive-customer-audio"
+      ) {
         setPhase("mic-blocked");
         return;
       }
@@ -279,7 +282,8 @@ export default function VoiceAgent({
         manualStopRef.current ||
         gracefulStopRef.current ||
         gracefulAssistantEnd ||
-        reason === "customer-ended-call"
+        reason === "customer-ended-call" ||
+        reason === "silence-timed-out"
       ) {
         setPhase("idle");
         setHasStartedConversation(false);
@@ -384,7 +388,6 @@ export default function VoiceAgent({
 
     vapi.on("call-start", () => {
       setPhase("listening");
-      flushPendingTypedMessages();
     });
 
     vapi.on("call-end", () => {
@@ -399,6 +402,7 @@ export default function VoiceAgent({
     vapi.on("speech-start", () => setPhase("speaking"));
     vapi.on("speech-end", () => {
       setPhase("listening");
+      flushPendingTypedMessages();
 
       if (assistantFinalFarewellRef.current) {
         gracefulStopRef.current = true;
@@ -712,7 +716,7 @@ export default function VoiceAgent({
 
       setTypedInput("");
 
-      if (isLive && vapiRef.current) {
+      if (phase === "listening" && vapiRef.current) {
         optimisticTypedMessagesRef.current.push(nextMessage);
         setTurns((prev) => [...prev, { role: "user", text: nextMessage }]);
 
@@ -731,7 +735,11 @@ export default function VoiceAgent({
         return;
       }
 
-      if (phase === "connecting") {
+      if (
+        phase === "connecting" ||
+        phase === "speaking" ||
+        phase === "thinking"
+      ) {
         optimisticTypedMessagesRef.current.push(nextMessage);
         pendingTypedMessagesRef.current.push(nextMessage);
         setTurns((prev) => [...prev, { role: "user", text: nextMessage }]);
@@ -740,7 +748,7 @@ export default function VoiceAgent({
 
       await startCall(nextMessage);
     },
-    [isLive, phase, startCall, typedInput],
+    [phase, startCall, typedInput],
   );
   const handleStartCall = useCallback(() => {
     void startCall();
