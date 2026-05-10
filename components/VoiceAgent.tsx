@@ -124,8 +124,12 @@ function isAssistantFinalFarewell(value: string) {
   const text = normalizedForIntent(value);
 
   return (
-    /\b(thanks for reaching out|have a great day|goodbye)\b/i.test(text) ||
-    /\b(gracias por contactarnos|hasta luego|que tengas buen dia)\b/i.test(text)
+    /\b(you'?re all set|you are all set|within 24 hours|have a great day|goodbye)\b/i.test(
+      text,
+    ) ||
+    /\b(todo listo|dentro de 24 horas|hasta luego|que tengas buen dia)\b/i.test(
+      text,
+    )
   );
 }
 

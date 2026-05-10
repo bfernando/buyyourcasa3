@@ -29,16 +29,6 @@ const DEFAULT_ELEVENLABS_MODELS = {
   es: "eleven_multilingual_v2",
 } as const;
 
-const END_CALL_PHRASES_EN = [
-  "Thanks for reaching out.",
-  "Have a great day.",
-] as const;
-
-const END_CALL_PHRASES_ES = [
-  "Gracias por contactarnos.",
-  "Hasta luego.",
-] as const;
-
 /**
  * Build the absolute URL that Vapi will POST function-tool calls to.
  * In production this must be the public https URL (Vercel). In local dev
@@ -230,7 +220,7 @@ Start by briefly introducing yourself and asking for the property address. Keep 
 ## Closing
 After \`complete_lead\`, say: "Perfect — you're all set. Someone from our team will call you within 24 hours with your cash offer. Thanks for reaching out." Then use the \`endCall\` tool.
 
-If the user seems to be wrapping up before all details are collected, say one short closing check such as: "Of course. Is there anything else I can help you with?" If they then say no, bye, done, or anything equivalent, say "Thanks for reaching out." and use the \`endCall\` tool. Do not ask another lead-capture question after they are trying to close.`;
+If the user seems to be wrapping up before all details are collected, say one short closing check such as: "Of course. Is there anything else I can help you with?" If they then say no, bye, done, or anything equivalent, say "Have a great day." and use the \`endCall\` tool. Do not ask another lead-capture question after they are trying to close.`;
 
 const SYSTEM_PROMPT_ES = `Eres un representante cálido y profesional de Mi Casa Investment Group, una empresa local que hace ofertas justas en efectivo por casas. Estás atendiendo una llamada de voz en el navegador de alguien que podría querer vender su casa.
 
@@ -273,7 +263,7 @@ Preséntate brevemente y pregunta por la dirección de la propiedad. Apertura de
 ## Cierre
 Después de \`complete_lead\`, di: "Perfecto — todo listo. Alguien de nuestro equipo te llamará dentro de 24 horas con tu oferta en efectivo. Gracias por contactarnos." Luego usa la herramienta \`endCall\`.
 
-Si el usuario parece estar cerrando antes de recolectar todos los datos, di una sola frase de cierre, por ejemplo: "Claro. Si hay algo más en lo que te pueda ayudar, aquí estoy." o, si encaja mejor, "Claro, ¿hay algo más en lo que te pueda ayudar?" Si después dice no, adiós, listo, ya terminé, o algo equivalente, di "Gracias por contactarnos." y usa la herramienta \`endCall\`. No vuelvas a hacer preguntas de captura de lead después de que intente cerrar.`;
+Si el usuario parece estar cerrando antes de recolectar todos los datos, di una sola frase de cierre, por ejemplo: "Claro. Si hay algo más en lo que te pueda ayudar, aquí estoy." o, si encaja mejor, "Claro, ¿hay algo más en lo que te pueda ayudar?" Si después dice no, adiós, listo, ya terminé, o algo equivalente, di "Hasta luego." y usa la herramienta \`endCall\`. No vuelvas a hacer preguntas de captura de lead después de que intente cerrar.`;
 
 // ─── First messages (spoken the moment the call connects) ──────────────────
 
@@ -328,7 +318,6 @@ function buildAssistant(lang: Locale) {
 
     firstMessage: isEs ? FIRST_MESSAGE_ES : FIRST_MESSAGE_EN,
     firstMessageMode: "assistant-speaks-first" as const,
-    endCallPhrases: isEs ? END_CALL_PHRASES_ES : END_CALL_PHRASES_EN,
 
     // ── Durations & behavior
     maxDurationSeconds: 600,
