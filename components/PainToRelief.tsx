@@ -15,14 +15,14 @@ export default function PainToRelief({ lang = "en" }: { lang?: Locale }) {
     <section
       ref={ref}
       className="relative py-28 lg:py-40 overflow-hidden"
-      style={{ background: "linear-gradient(180deg, #08080C 0%, #0E0E14 50%, #08080C 100%)" }}
+      style={{ background: "linear-gradient(180deg, #F3EDE4 0%, #FFFDF9 50%, #F3EDE4 100%)" }}
     >
       <div
         className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
         aria-hidden
       >
         <span
-          className="font-display font-bold text-white/[0.015] leading-none whitespace-nowrap"
+          className="font-display font-bold text-gold/[0.05] leading-none whitespace-nowrap"
           style={{ fontSize: "clamp(8rem, 25vw, 22rem)" }}
         >
           Relief

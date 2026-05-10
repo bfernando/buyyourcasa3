@@ -8,7 +8,7 @@ function StarRating({ count }: { count: number }) {
   return (
     <div className="flex gap-1">
       {[...Array(count)].map((_, i) => (
-        <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#C9A96E">
+        <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#0D6D66">
           <path d="M6.5 1L8.06 4.41L11.75 4.9L9.13 7.45L9.79 11.1L6.5 9.3L3.21 11.1L3.87 7.45L1.25 4.9L4.94 4.41L6.5 1Z"/>
         </svg>
       ))}
@@ -31,7 +31,7 @@ export default function Testimonials({ lang = "en" }: { lang?: Locale }) {
       <div
         className="absolute inset-x-0 bottom-0 h-2/3 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at 50% 100%, rgba(201,169,110,0.04) 0%, transparent 60%)",
+          background: "radial-gradient(ellipse at 50% 100%, rgba(13,109,102,0.04) 0%, transparent 60%)",
         }}
       />
 
@@ -119,7 +119,7 @@ export default function Testimonials({ lang = "en" }: { lang?: Locale }) {
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-display ${
-                  active === i ? "bg-gold text-obsidian-900" : "bg-surface-hover text-cream/50"
+                  active === i ? "bg-gold text-white" : "bg-surface-hover text-cream/50"
                 }`}>
                   {t.initials}
                 </div>

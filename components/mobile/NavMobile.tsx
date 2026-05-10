@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import clsx from "clsx";
 import { content, Locale } from "@/lib/content";
 import { trackContactClick } from "@/lib/meta-pixel";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function NavMobile({ lang = "en" }: { lang?: Locale }) {
   const c = content[lang].nav;
@@ -29,12 +30,7 @@ export default function NavMobile({ lang = "en" }: { lang?: Locale }) {
       )}
     >
       <a href="/" className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-[3px] bg-gold-gradient flex items-center justify-center">
-          <span className="text-obsidian-900 font-display font-bold text-xs leading-none">B</span>
-        </div>
-        <span className="font-display text-lg font-medium text-cream">
-          Buy<span className="text-gradient-gold">YourCasa</span>
-        </span>
+        <BrandLogo compact />
       </a>
 
       <a

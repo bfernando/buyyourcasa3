@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { content, Locale } from "@/lib/content";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Navigation({ lang = "en" }: { lang?: Locale }) {
   const c = content[lang].nav;
@@ -32,12 +33,7 @@ export default function Navigation({ lang = "en" }: { lang?: Locale }) {
         <div className="max-w-7xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
           {/* Logo */}
           <a href="/" className="flex items-center gap-2.5 group">
-            <div className="w-7 h-7 rounded-sm bg-gold-gradient flex items-center justify-center">
-              <span className="text-obsidian-900 font-display font-bold text-sm leading-none">B</span>
-            </div>
-            <span className="font-display text-xl font-medium text-cream tracking-wide">
-              Buy<span className="text-gradient-gold">YourCasa</span>
-            </span>
+            <BrandLogo />
           </a>
 
           {/* Desktop links */}

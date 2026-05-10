@@ -68,7 +68,7 @@ export default function TestimonialsMobile({ lang = "en" }: { lang?: Locale }) {
             <div className="p-6">
               <div className="flex gap-1 mb-4">
                 {[...Array(t.rating)].map((_, i) => (
-                  <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#C9A96E">
+                  <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#0D6D66">
                     <path d="M6.5 1L8.06 4.41L11.75 4.9L9.13 7.45L9.79 11.1L6.5 9.3L3.21 11.1L3.87 7.45L1.25 4.9L4.94 4.41L6.5 1Z"/>
                   </svg>
                 ))}

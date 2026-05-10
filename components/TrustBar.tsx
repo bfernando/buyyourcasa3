@@ -84,7 +84,7 @@ export default function TrustBar({ lang = "en" }: { lang?: Locale }) {
           <div className="flex items-center gap-2.5">
             <div className="flex gap-0.5">
               {[...Array(5)].map((_, i) => (
-                <svg key={i} width="14" height="14" viewBox="0 0 14 14" fill="#C9A96E">
+                <svg key={i} width="14" height="14" viewBox="0 0 14 14" fill="#0D6D66">
                   <path d="M7 1l1.63 3.3 3.63.53-2.63 2.56.62 3.62L7 9.27l-3.25 1.74.62-3.62L1.74 4.83l3.63-.53L7 1z"/>
                 </svg>
               ))}
@@ -96,8 +96,8 @@ export default function TrustBar({ lang = "en" }: { lang?: Locale }) {
 
           <div className="flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 1L2 3.5v5.5c0 3.04 2.59 5.44 6 6.5 3.41-1.06 6-3.46 6-6.5V3.5L8 1z" stroke="#C9A96E" strokeWidth="1.2" fill="rgba(201,169,110,0.08)"/>
-              <path d="M5.5 8l2 2 3-3" stroke="#C9A96E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M8 1L2 3.5v5.5c0 3.04 2.59 5.44 6 6.5 3.41-1.06 6-3.46 6-6.5V3.5L8 1z" stroke="#0D6D66" strokeWidth="1.2" fill="rgba(13,109,102,0.08)"/>
+              <path d="M5.5 8l2 2 3-3" stroke="#0D6D66" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <span className="text-cream/50 text-sm font-body">{c.badge1}</span>
           </div>
@@ -106,8 +106,8 @@ export default function TrustBar({ lang = "en" }: { lang?: Locale }) {
 
           <div className="flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6.5" stroke="#C9A96E" strokeWidth="1.2"/>
-              <path d="M5.5 8l2 2 3-3" stroke="#C9A96E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="8" cy="8" r="6.5" stroke="#0D6D66" strokeWidth="1.2"/>
+              <path d="M5.5 8l2 2 3-3" stroke="#0D6D66" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <span className="text-cream/50 text-sm font-body">{c.badge2}</span>
           </div>

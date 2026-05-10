@@ -13,12 +13,12 @@ export default function FinalCTA({ lang = "en" }: { lang?: Locale }) {
     <section
       ref={ref}
       className="relative py-32 lg:py-48 overflow-hidden"
-      style={{ background: "linear-gradient(180deg, #08080C 0%, #0C0C12 50%, #08080C 100%)" }}
+      style={{ background: "linear-gradient(180deg, #F3EDE4 0%, #FFFDF9 50%, #F3EDE4 100%)" }}
     >
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at 50% 60%, rgba(201,169,110,0.09) 0%, transparent 65%)",
+          background: "radial-gradient(ellipse at 50% 60%, rgba(13,109,102,0.10) 0%, transparent 65%)",
         }}
       />
 
@@ -95,10 +95,10 @@ export default function FinalCTA({ lang = "en" }: { lang?: Locale }) {
           className="flex flex-wrap items-center justify-center gap-6 mt-10 text-cream/25 text-xs font-body uppercase tracking-widest"
         >
           {c.micros.map((micro, i) => (
-            <>
-              <span key={micro}>{micro}</span>
-              {i < c.micros.length - 1 && <span key={`dot-${i}`} className="w-1 h-1 rounded-full bg-gold/30" />}
-            </>
+            <span key={micro} className="contents">
+              <span>{micro}</span>
+              {i < c.micros.length - 1 && <span className="w-1 h-1 rounded-full bg-gold/30" />}
+            </span>
           ))}
         </motion.div>
       </div>

@@ -47,7 +47,7 @@ function ProgressBar({ currentStep, stepLabels }: { currentStep: number; stepLab
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium font-body transition-all duration-500 ${
                   i + 1 < currentStep
-                    ? "bg-gold text-obsidian-900"
+                    ? "bg-gold text-white"
                     : i + 1 === currentStep
                     ? "bg-gold/15 border-2 border-gold text-gold"
                     : "bg-surface-hover border border-surface-border text-cream/30"
@@ -148,7 +148,7 @@ function OptionCard({
           ? "border-gold/50 bg-gold/8"
           : "border-surface-border bg-surface-hover hover:border-gold/25 hover:bg-gold/4"
       }`}
-      style={{ background: selected ? "rgba(201,169,110,0.07)" : undefined }}
+      style={{ background: selected ? "rgba(13,109,102,0.07)" : undefined }}
     >
       {/* Check */}
       <div className={`absolute top-3.5 right-3.5 w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300 ${
@@ -156,7 +156,7 @@ function OptionCard({
       }`}>
         {selected && (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 5l2.5 2.5 4-4" stroke="#08080C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 5l2.5 2.5 4-4" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
       </div>
@@ -342,7 +342,7 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at 50% 50%, rgba(201,169,110,0.06) 0%, transparent 65%)",
+          background: "radial-gradient(ellipse at 50% 50%, rgba(13,109,102,0.06) 0%, transparent 65%)",
         }}
       />
 
@@ -383,7 +383,7 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
                 <div key={item} className="flex items-start gap-3">
                   <div className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-gold/10 flex items-center justify-center">
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                      <path d="M2 5l2.5 2.5 4-4" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2 5l2.5 2.5 4-4" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </div>
                   <span className="text-cream/55 font-body text-sm">{item}</span>
@@ -395,24 +395,30 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
             <div className="flex flex-wrap gap-6 pt-8 border-t border-surface-border">
               <div className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 1L2 3.5v5.5c0 3.04 2.59 5.44 6 6.5 3.41-1.06 6-3.46 6-6.5V3.5L8 1z" stroke="#C9A96E" strokeWidth="1.2" fill="rgba(201,169,110,0.08)"/>
-                  <path d="M5.5 8l2 2 3-3" stroke="#C9A96E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8 1L2 3.5v5.5c0 3.04 2.59 5.44 6 6.5 3.41-1.06 6-3.46 6-6.5V3.5L8 1z" stroke="#0D6D66" strokeWidth="1.2" fill="rgba(13,109,102,0.08)"/>
+                  <path d="M5.5 8l2 2 3-3" stroke="#0D6D66" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-cream/40 text-xs font-body">SSL Secured</span>
+                <span className="text-cream/40 text-xs font-body">
+                  {lang === "es" ? "SSL Seguro" : "SSL Secured"}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="6.5" stroke="#C9A96E" strokeWidth="1.2"/>
-                  <path d="M5.5 8l2 2 3-3" stroke="#C9A96E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="8" cy="8" r="6.5" stroke="#0D6D66" strokeWidth="1.2"/>
+                  <path d="M5.5 8l2 2 3-3" stroke="#0D6D66" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-cream/40 text-xs font-body">No Spam Policy</span>
+                <span className="text-cream/40 text-xs font-body">
+                  {lang === "es" ? "Sin Spam" : "No Spam Policy"}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="4" width="12" height="9" rx="1.5" stroke="#C9A96E" strokeWidth="1.2"/>
-                  <path d="M5 4V3.5a3 3 0 016 0V4" stroke="#C9A96E" strokeWidth="1.2"/>
+                  <rect x="2" y="4" width="12" height="9" rx="1.5" stroke="#0D6D66" strokeWidth="1.2"/>
+                  <path d="M5 4V3.5a3 3 0 016 0V4" stroke="#0D6D66" strokeWidth="1.2"/>
                 </svg>
-                <span className="text-cream/40 text-xs font-body">Data Protected</span>
+                <span className="text-cream/40 text-xs font-body">
+                  {lang === "es" ? "Datos Protegidos" : "Data Protected"}
+                </span>
               </div>
             </div>
           </motion.div>
@@ -711,7 +717,7 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
                       >
                         <motion.path
                           d="M6 16l7 7 13-13"
-                          stroke="#C9A96E"
+                          stroke="#0D6D66"
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"

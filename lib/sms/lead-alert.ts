@@ -31,7 +31,7 @@ function buildSmsBody(lead: Lead): string {
     .join(" ");
 
   return [
-    "New completed BuyYourCasa lead",
+    "New completed Mi Casa lead",
     `Address: ${valueOrFallback(lead.address)}`,
     `Name: ${valueOrFallback(name)}`,
     `Phone: ${valueOrFallback(lead.phone)}`,
@@ -121,7 +121,7 @@ export async function sendLeadCompletionSmsAlert(
 export async function sendTestSmsAlert(): Promise<SmsAlertResult> {
   const to = notificationNumbers();
   const body =
-    "BuyYourCasa test notification: SMS alerts are connected for new completed leads.";
+    "Mi Casa test notification: SMS alerts are connected for new completed leads.";
 
   if (to.length === 0) {
     return { ok: false, skipped: true, reason: "missing_recipients" };

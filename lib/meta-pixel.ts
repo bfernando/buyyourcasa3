@@ -91,7 +91,7 @@ export function trackMetaCustomEvent(
 
 export function trackLeadStarted(source: string, lang?: string) {
   trackMetaCustomEvent("LeadStarted", {
-    content_name: "BuyYourCasa lead funnel",
+    content_name: "Mi Casa lead funnel",
     content_category: source,
     language: lang,
   });
@@ -106,7 +106,7 @@ export function trackLeadComplete({
   trackMetaStandardEvent(
     "Lead",
     {
-      content_name: "BuyYourCasa lead",
+      content_name: "Mi Casa lead",
       content_category: source,
       language: lang,
       lead_id: leadId ?? undefined,

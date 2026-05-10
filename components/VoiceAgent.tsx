@@ -28,6 +28,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion";
 import Vapi from "@vapi-ai/web";
 import { content, type Locale } from "@/lib/content";
+import BrandLogo from "@/components/BrandLogo";
 import {
   createMetaEventId,
   getMetaBrowserContext,
@@ -680,18 +681,13 @@ export default function VoiceAgent({
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 40%, rgba(201,169,110,0.12) 0%, transparent 65%)",
+            "radial-gradient(ellipse at 50% 40%, rgba(13,109,102,0.12) 0%, transparent 65%)",
         }}
       />
 
       {/* Top-left brand / top-right dismiss */}
-      <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-6 lg:px-10 py-5">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-          <span className="text-gold/70 uppercase tracking-[0.3em] text-[11px] font-body">
-            BuyYourCasa
-          </span>
-        </div>
+      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-6 lg:px-10 py-5">
+        <BrandLogo compact />
 
         {/* Learn more ↓ — dismisses overlay so user can scroll the SEO content */}
         <button
@@ -922,7 +918,7 @@ export default function VoiceAgent({
                 >
                   <motion.path
                     d="M6 16l7 7 13-13"
-                    stroke="#C9A96E"
+                    stroke="#0D6D66"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -994,7 +990,7 @@ export default function VoiceAgent({
               <button
                 type="submit"
                 disabled={!typedInput.trim()}
-                className="shrink-0 rounded-xl bg-gold px-5 py-3 text-xs font-body uppercase tracking-[0.22em] text-obsidian-900 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded-xl bg-gold px-5 py-3 text-xs font-body uppercase tracking-[0.22em] text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {c.typeSend}
               </button>
@@ -1026,7 +1022,7 @@ function TapToTalkButton({
       <span className="absolute inset-0 rounded-full bg-gold/10 scale-110 animate-ping" />
 
       {/* Button body */}
-      <span className="relative inline-flex items-center justify-center w-32 h-32 lg:w-36 lg:h-36 rounded-full bg-gradient-to-br from-gold to-gold-300 text-obsidian-900 shadow-2xl shadow-gold/30 transition-transform duration-300 group-hover:scale-105 group-active:scale-95">
+      <span className="relative inline-flex items-center justify-center w-32 h-32 lg:w-36 lg:h-36 rounded-full bg-gradient-to-br from-gold to-gold-300 text-white shadow-2xl shadow-gold/30 transition-transform duration-300 group-hover:scale-105 group-active:scale-95">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
           <path
             d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"
@@ -1104,9 +1100,9 @@ function TrustRow({ items }: { items: readonly string[] }) {
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path
               d="M8 1L2 3.5v5.5c0 3.04 2.59 5.44 6 6.5 3.41-1.06 6-3.46 6-6.5V3.5L8 1z"
-              stroke="#C9A96E"
+              stroke="#0D6D66"
               strokeWidth="1.2"
-              fill="rgba(201,169,110,0.08)"
+              fill="rgba(13,109,102,0.08)"
             />
           </svg>
           <span className="text-cream/40 text-[11px] font-body uppercase tracking-wider">

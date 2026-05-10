@@ -37,7 +37,7 @@ export default function HowItWorks({ lang = "en" }: { lang?: Locale }) {
       <div
         className="absolute inset-x-0 top-0 h-1/2 opacity-40 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.06) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse at 50% 0%, rgba(13,109,102,0.06) 0%, transparent 70%)",
         }}
       />
 
@@ -96,7 +96,7 @@ export default function HowItWorks({ lang = "en" }: { lang?: Locale }) {
                       <div className="text-gold">{stepIcons[i]}</div>
                     </div>
                     <div className="absolute -top-2 -right-2 w-9 h-9 rounded-full bg-gold flex items-center justify-center">
-                      <span className="font-display text-obsidian-900 text-sm font-semibold leading-none">
+                      <span className="font-display text-white text-sm font-semibold leading-none">
                         {i + 1}
                       </span>
                     </div>
@@ -132,7 +132,9 @@ export default function HowItWorks({ lang = "en" }: { lang?: Locale }) {
               <path d="M3 8H13M8 3L13 8L8 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </a>
-          <p className="text-cream/30 text-xs font-body mt-4 uppercase tracking-widest">No obligation · No spam · 100% free</p>
+          <p className="text-cream/30 text-xs font-body mt-4 uppercase tracking-widest">
+            {content[lang].form.microcopy}
+          </p>
         </motion.div>
       </div>
     </section>

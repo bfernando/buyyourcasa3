@@ -123,7 +123,7 @@ export async function sendMetaLeadEvent({
         event_source_url: eventSourceUrl,
         user_data: buildUserData(lead, req, browser),
         custom_data: {
-          content_name: "BuyYourCasa lead",
+          content_name: "Mi Casa lead",
           content_category: lead.source,
           lead_id: lead.id,
         },

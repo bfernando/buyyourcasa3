@@ -32,7 +32,7 @@ export default function SpanishHome() {
         <FAQ lang="es" />
         <LeadForm lang="es" />
         <FinalCTA lang="es" />
-        <Footer />
+        <Footer lang="es" />
       </main>
 
       {!overlayDismissed && (

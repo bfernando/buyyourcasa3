@@ -5,10 +5,10 @@ import { motion, useInView } from "framer-motion";
 import { content, Locale } from "@/lib/content";
 
 const cities = [
-  "Atlanta", "Birmingham", "Nashville", "Charlotte", "Memphis",
-  "Jacksonville", "Savannah", "Chattanooga", "Columbia", "Greenville",
-  "Huntsville", "Knoxville", "Mobile", "Macon", "Montgomery",
-  "Augusta", "Columbus", "Gainesville", "Tallahassee", "Pensacola",
+  "San Diego", "Chula Vista", "National City", "La Mesa", "El Cajon",
+  "Spring Valley", "Lemon Grove", "Imperial Beach", "Bonita", "Santee",
+  "Coronado", "North Park", "City Heights", "Barrio Logan", "Logan Heights",
+  "Mission Valley", "Clairemont", "Encanto", "Otay Mesa", "Linda Vista",
 ];
 
 export default function ServiceArea({ lang = "en" }: { lang?: Locale }) {
@@ -105,16 +105,16 @@ export default function ServiceArea({ lang = "en" }: { lang?: Locale }) {
                         cx={i * 21 + 5}
                         cy={j * 21 + 5}
                         r="1.5"
-                        fill="#C9A96E"
-                        opacity={Math.random() > 0.5 ? "0.6" : "0.2"}
+                        fill="#0D6D66"
+                        opacity={(i + j) % 3 === 0 ? "0.6" : "0.2"}
                       />
                     ))
                   )}
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="font-display text-5xl font-light text-gradient-gold mb-1">SE</div>
-                    <div className="text-cream/30 text-xs uppercase tracking-widest font-body">United States</div>
+                    <div className="font-display text-5xl font-light text-gradient-gold mb-1">SD</div>
+                    <div className="text-cream/30 text-xs uppercase tracking-widest font-body">County</div>
                   </div>
                 </div>
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">

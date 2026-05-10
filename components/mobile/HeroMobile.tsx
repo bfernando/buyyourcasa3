@@ -32,26 +32,26 @@ export default function HeroMobile({ onAddressSubmit, lang = "en" }: HeroMobileP
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0" style={{
-          background: "linear-gradient(160deg, #0E0B18 0%, #08080C 40%, #0A1018 70%, #06060A 100%)"
+          background: "linear-gradient(160deg, #FFFDF9 0%, #F6F1E9 46%, #ECE2D4 100%)"
         }} />
         <div className="absolute -top-16 -right-16 w-80 h-80 rounded-full" style={{
-          background: "radial-gradient(ellipse, rgba(201,169,110,0.28) 0%, transparent 65%)"
+          background: "radial-gradient(ellipse, rgba(255,138,0,0.18) 0%, transparent 65%)"
         }} />
         <div className="absolute -top-16 -left-16 w-72 h-72 rounded-full" style={{
-          background: "radial-gradient(ellipse, rgba(80,65,140,0.5) 0%, transparent 65%)"
+          background: "radial-gradient(ellipse, rgba(13,109,102,0.18) 0%, transparent 65%)"
         }} />
         <div className="absolute bottom-1/4 -right-20 w-56 h-56 rounded-full" style={{
-          background: "radial-gradient(ellipse, rgba(140,100,50,0.2) 0%, transparent 65%)"
+          background: "radial-gradient(ellipse, rgba(181,149,99,0.18) 0%, transparent 65%)"
         }} />
-        <svg className="absolute inset-0 w-full h-full opacity-[0.07]" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" fill="none">
-          <line x1="195" y1="0" x2="0" y2="844" stroke="white" strokeWidth="0.7"/>
-          <line x1="195" y1="0" x2="390" y2="844" stroke="white" strokeWidth="0.7"/>
-          <line x1="195" y1="0" x2="97" y2="844" stroke="white" strokeWidth="0.5"/>
-          <line x1="195" y1="0" x2="293" y2="844" stroke="white" strokeWidth="0.5"/>
-          <line x1="0" y1="280" x2="390" y2="280" stroke="white" strokeWidth="0.4"/>
-          <line x1="0" y1="560" x2="390" y2="560" stroke="white" strokeWidth="0.4"/>
-          <circle cx="195" cy="0" r="200" stroke="white" strokeWidth="0.3"/>
-          <circle cx="195" cy="0" r="380" stroke="white" strokeWidth="0.2"/>
+        <svg className="absolute inset-0 w-full h-full opacity-[0.10]" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" fill="none">
+          <line x1="195" y1="0" x2="0" y2="844" stroke="#0D6D66" strokeWidth="0.7"/>
+          <line x1="195" y1="0" x2="390" y2="844" stroke="#0D6D66" strokeWidth="0.7"/>
+          <line x1="195" y1="0" x2="97" y2="844" stroke="#0D6D66" strokeWidth="0.5"/>
+          <line x1="195" y1="0" x2="293" y2="844" stroke="#0D6D66" strokeWidth="0.5"/>
+          <line x1="0" y1="280" x2="390" y2="280" stroke="#B59563" strokeWidth="0.4"/>
+          <line x1="0" y1="560" x2="390" y2="560" stroke="#B59563" strokeWidth="0.4"/>
+          <circle cx="195" cy="0" r="200" stroke="#0D6D66" strokeWidth="0.3"/>
+          <circle cx="195" cy="0" r="380" stroke="#0D6D66" strokeWidth="0.2"/>
         </svg>
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-obsidian-900 to-transparent" />
       </div>

@@ -59,7 +59,7 @@ export default function HowItWorksMobile({ lang = "en" }: { lang?: Locale }) {
               <div className="w-[52px] h-[52px] rounded-full bg-surface border border-gold/20 flex items-center justify-center relative z-10">
                 <div className="text-gold">{stepIcons[i]}</div>
                 <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gold flex items-center justify-center">
-                  <span className="font-body text-[10px] font-bold text-obsidian-900">{i + 1}</span>
+                  <span className="font-body text-[10px] font-bold text-white">{i + 1}</span>
                 </div>
               </div>
             </div>

@@ -66,7 +66,7 @@ export default function FAQ({ lang = "en" }: { lang?: Locale }) {
       <div
         className="absolute left-0 top-1/2 -translate-y-1/2 w-[600px] h-[600px] pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse, rgba(201,169,110,0.04) 0%, transparent 65%)",
+          background: "radial-gradient(ellipse, rgba(13,109,102,0.04) 0%, transparent 65%)",
         }}
       />
 

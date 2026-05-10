@@ -49,8 +49,8 @@ export default function ComparisonMobile({ lang = "en" }: { lang?: Locale }) {
               {usBenefits.map((item, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <svg className="shrink-0 mt-0.5" width="15" height="15" viewBox="0 0 15 15" fill="none">
-                    <circle cx="7.5" cy="7.5" r="6.5" fill="rgba(201,169,110,0.12)"/>
-                    <path d="M4.5 7.5l2 2 4-4" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="7.5" cy="7.5" r="6.5" fill="rgba(13,109,102,0.12)"/>
+                    <path d="M4.5 7.5l2 2 4-4" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                   <span className="text-cream/85 font-body text-sm leading-snug">{item}</span>
                 </li>

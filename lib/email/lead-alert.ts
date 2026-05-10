@@ -85,7 +85,7 @@ function buildHtmlBody(lead: Lead): string {
   <body style="margin:0;padding:24px;background:#f3f4f6;color:#111827;font-family:Arial,sans-serif;">
     <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
       <div style="padding:20px 24px;background:#111827;color:#f9fafb;">
-        <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#d1d5db;">BuyYourCasa</p>
+        <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#d1d5db;">Mi Casa Investment Group</p>
         <h1 style="margin:0;font-size:24px;line-height:1.2;">New Completed Lead</h1>
       </div>
       <div style="padding:24px;">

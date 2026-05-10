@@ -14,14 +14,14 @@ export default function FinalCTAMobile({ lang = "en" }: { lang?: Locale }) {
       ref={ref}
       className="relative py-20 px-5 overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #08080C 0%, #0D0D16 50%, #08080C 100%)",
+        background: "linear-gradient(180deg, #F3EDE4 0%, #FFFDF9 50%, #F3EDE4 100%)",
         paddingBottom: "calc(5rem + env(safe-area-inset-bottom))",
       }}
     >
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at 50% 60%, rgba(201,169,110,0.09) 0%, transparent 60%)",
+          background: "radial-gradient(ellipse at 50% 60%, rgba(13,109,102,0.10) 0%, transparent 60%)",
         }}
       />
 

@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import { type Locale } from "@/lib/content";
 
 /**
  * TrustStripMobile
@@ -20,20 +21,30 @@ const items = [
   { label: "Any Situation", icon: "♥" },
 ];
 
-export default function TrustStripMobile() {
+const itemsEs = [
+  { label: "Sin Arreglos", icon: "🔧" },
+  { label: "Sin Cargos", icon: "✓" },
+  { label: "Oferta Cash", icon: "$" },
+  { label: "Cierre Rápido", icon: "⚡" },
+  { label: "Como Está", icon: "🏠" },
+  { label: "Cualquier Caso", icon: "♥" },
+];
+
+export default function TrustStripMobile({ lang = "en" }: { lang?: Locale }) {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-40px" });
+  const trustItems = lang === "es" ? itemsEs : items;
 
   return (
     <section ref={ref} className="bg-surface border-y border-surface-border py-8 px-5">
       {/* Section label */}
       <p className="text-center text-[10px] uppercase tracking-[0.25em] text-gold/50 font-body mb-5">
-        The BuyYourCasa Standard
+        {lang === "es" ? "El Estándar Mi Casa" : "The Mi Casa Standard"}
       </p>
 
       {/* 2×3 grid */}
       <div className="grid grid-cols-3 gap-px bg-surface-border border border-surface-border">
-        {items.map((item, i) => (
+        {trustItems.map((item, i) => (
           <motion.div
             key={item.label}
             initial={{ opacity: 0, scale: 0.95 }}
@@ -44,31 +55,31 @@ export default function TrustStripMobile() {
             <span className="text-xl leading-none" aria-hidden>
               {item.icon === "✓" ? (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <circle cx="11" cy="11" r="9" stroke="#C9A96E" strokeWidth="1.5"/>
-                  <path d="M7 11l3 3 5-5" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="11" cy="11" r="9" stroke="#0D6D66" strokeWidth="1.5"/>
+                  <path d="M7 11l3 3 5-5" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               ) : item.icon === "$" ? (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M11 4v14M7.5 16.5c1 .7 2.2 1 3.5 1s2.5-.4 3.5-1c.7-.5 1-1.2 1-2 0-2.5-5-2.5-5-5 0-.8.3-1.5 1-2C12.5 7 13.7 6.5 15 6.5" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M7 7.5c.7-.7 2-1.5 4-1.5" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M11 4v14M7.5 16.5c1 .7 2.2 1 3.5 1s2.5-.4 3.5-1c.7-.5 1-1.2 1-2 0-2.5-5-2.5-5-5 0-.8.3-1.5 1-2C12.5 7 13.7 6.5 15 6.5" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M7 7.5c.7-.7 2-1.5 4-1.5" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
               ) : item.icon === "⚡" ? (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M13 3L5 12h7l-1 7 9-10h-7l1-6z" stroke="#C9A96E" strokeWidth="1.5" strokeLinejoin="round"/>
+                  <path d="M13 3L5 12h7l-1 7 9-10h-7l1-6z" stroke="#0D6D66" strokeWidth="1.5" strokeLinejoin="round"/>
                 </svg>
               ) : item.icon === "🔧" ? (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M15 5a4 4 0 01-4 7.46L7 16.5a2 2 0 01-2.83-2.83l4.04-4A4 4 0 0115 5z" stroke="#C9A96E" strokeWidth="1.5" strokeLinejoin="round"/>
+                  <path d="M15 5a4 4 0 01-4 7.46L7 16.5a2 2 0 01-2.83-2.83l4.04-4A4 4 0 0115 5z" stroke="#0D6D66" strokeWidth="1.5" strokeLinejoin="round"/>
                 </svg>
               ) : item.icon === "🏠" ? (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M3 9.5L11 3l8 6.5V19H3V9.5z" stroke="#C9A96E" strokeWidth="1.5" strokeLinejoin="round"/>
-                  <rect x="8" y="13" width="6" height="6" stroke="#C9A96E" strokeWidth="1.5"/>
+                  <path d="M3 9.5L11 3l8 6.5V19H3V9.5z" stroke="#0D6D66" strokeWidth="1.5" strokeLinejoin="round"/>
+                  <rect x="8" y="13" width="6" height="6" stroke="#0D6D66" strokeWidth="1.5"/>
                 </svg>
               ) : (
                 <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                  <path d="M11 4C7.5 4 4 7.5 4 11c0 5 7 13 7 13s7-8 7-13c0-3.5-3.5-7-7-7z" stroke="#C9A96E" strokeWidth="1.5"/>
-                  <circle cx="11" cy="11" r="2.5" stroke="#C9A96E" strokeWidth="1.5"/>
+                  <path d="M11 4C7.5 4 4 7.5 4 11c0 5 7 13 7 13s7-8 7-13c0-3.5-3.5-7-7-7z" stroke="#0D6D66" strokeWidth="1.5"/>
+                  <circle cx="11" cy="11" r="2.5" stroke="#0D6D66" strokeWidth="1.5"/>
                 </svg>
               )}
             </span>
@@ -88,7 +99,7 @@ export default function TrustStripMobile() {
       >
         <div className="flex gap-0.5">
           {[...Array(5)].map((_, i) => (
-            <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill="#C9A96E">
+            <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill="#0D6D66">
               <path d="M6 1L7.5 4.2l3.5.5-2.5 2.4.6 3.4L6 8.9l-3.1 1.6.6-3.4L1 4.7l3.5-.5L6 1z"/>
             </svg>
           ))}

@@ -28,7 +28,7 @@ export default function SpanishMobilePage() {
       <main className="bg-obsidian-900 min-h-screen">
         <NavMobile lang="es" />
         <HeroMobile onAddressSubmit={handleHeroAddress} lang="es" />
-        <TrustStripMobile />
+        <TrustStripMobile lang="es" />
         <HowItWorksMobile lang="es" />
         <PainChipsMobile lang="es" />
         <ComparisonMobile lang="es" />
@@ -36,7 +36,7 @@ export default function SpanishMobilePage() {
         <LeadFormMobile prefillAddress={heroAddress} lang="es" />
         <FAQMobile lang="es" />
         <FinalCTAMobile lang="es" />
-        <Footer />
+        <Footer lang="es" />
         <StickyCTA lang="es" />
       </main>
 

@@ -166,7 +166,7 @@ const tools = [
 
 // ─── System prompts ────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT_EN = `You are a warm, professional representative for BuyYourCasa, a company that makes fair all-cash offers on homes. You're answering a browser-based voice chat from someone who may want to sell their home.
+const SYSTEM_PROMPT_EN = `You are a warm, professional representative for Mi Casa Investment Group, a local company that makes fair all-cash offers on homes. You're answering a browser-based voice chat from someone who may want to sell their home.
 
 ## Your goal
 Collect four things, in roughly this order, as quickly and painlessly as possible:
@@ -203,7 +203,7 @@ Start by briefly introducing yourself and asking for the property address. Keep 
 ## Closing
 After \`complete_lead\`, say something like: "Perfect — you're all set. Someone from our team will call you within 24 hours with your cash offer. Thanks for reaching out." Then end the call.`;
 
-const SYSTEM_PROMPT_ES = `Eres un representante cálido y profesional de BuyYourCasa, una empresa que hace ofertas justas en efectivo por casas. Estás atendiendo una llamada de voz en el navegador de alguien que podría querer vender su casa.
+const SYSTEM_PROMPT_ES = `Eres un representante cálido y profesional de Mi Casa Investment Group, una empresa local que hace ofertas justas en efectivo por casas. Estás atendiendo una llamada de voz en el navegador de alguien que podría querer vender su casa.
 
 ## Tu objetivo
 Recolectar cuatro cosas, más o menos en este orden, de la forma más rápida y sencilla posible:
@@ -257,7 +257,7 @@ function buildAssistant(lang: Locale) {
   const isEs = lang === "es";
 
   return {
-    name: isEs ? "BuyYourCasa ES" : "BuyYourCasa EN",
+    name: isEs ? "Mi Casa ES" : "Mi Casa EN",
 
     // ── Transcriber: Deepgram Nova-3 handles Spanish well, multi for Spanglish
     transcriber: {

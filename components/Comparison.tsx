@@ -20,7 +20,7 @@ export default function Comparison({ lang = "en" }: { lang?: Locale }) {
       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
       <div
         className="absolute right-0 top-1/2 -translate-y-1/2 w-[500px] h-[500px] pointer-events-none"
-        style={{ background: "radial-gradient(ellipse, rgba(201,169,110,0.04) 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse, rgba(13,109,102,0.04) 0%, transparent 70%)" }}
       />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
@@ -53,7 +53,9 @@ export default function Comparison({ lang = "en" }: { lang?: Locale }) {
         >
           <div className="grid grid-cols-[1fr,1fr,1fr] bg-obsidian-900">
             <div className="px-6 py-5 border-r border-surface-border">
-              <span className="text-xs uppercase tracking-widest text-cream/30 font-body">Category</span>
+              <span className="text-xs uppercase tracking-widest text-cream/30 font-body">
+                {lang === "es" ? "Categoría" : "Category"}
+              </span>
             </div>
             <div className="px-6 py-5 border-r border-surface-border bg-gold/5 border-t border-t-gold/40">
               <div className="flex items-center gap-2">
@@ -81,8 +83,8 @@ export default function Comparison({ lang = "en" }: { lang?: Locale }) {
               </div>
               <div className="px-6 py-5 border-r border-surface-border bg-gold/[0.03] flex items-start gap-2.5">
                 <svg className="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <circle cx="7" cy="7" r="6" fill="rgba(201,169,110,0.15)"/>
-                  <path d="M4.5 7l2 2 3-3" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="7" cy="7" r="6" fill="rgba(13,109,102,0.15)"/>
+                  <path d="M4.5 7l2 2 3-3" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span className="text-cream/85 font-body text-sm font-medium">{row.us}</span>
               </div>

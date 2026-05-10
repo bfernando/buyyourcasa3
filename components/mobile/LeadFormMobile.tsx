@@ -81,7 +81,7 @@ function OptionCard({
       }`}>
         {selected && (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 5l2.5 2.5 4-4" stroke="#08080C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 5l2.5 2.5 4-4" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
       </div>
@@ -390,8 +390,8 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
                     />
                     <div className="flex items-center gap-2 bg-obsidian-900 rounded-sm px-4 py-3 border border-surface-border">
                       <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                        <path d="M7.5 1.5A6 6 0 1 1 7.5 13.5 6 6 0 0 1 7.5 1.5z" stroke="#C9A96E" strokeWidth="1.2"/>
-                        <path d="M7.5 6.5v4M7.5 4.5v.5" stroke="#C9A96E" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M7.5 1.5A6 6 0 1 1 7.5 13.5 6 6 0 0 1 7.5 1.5z" stroke="#0D6D66" strokeWidth="1.2"/>
+                        <path d="M7.5 6.5v4M7.5 4.5v.5" stroke="#0D6D66" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
                       <p className="text-cream/40 font-body text-xs">{c.steps[1].privacyNote}</p>
                     </div>
@@ -606,7 +606,7 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
             >
               <motion.path
                 d="M6 16l7 7 13-13"
-                stroke="#C9A96E"
+                stroke="#0D6D66"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
