@@ -3,6 +3,12 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { content, Locale } from "@/lib/content";
+import {
+  createMetaEventId,
+  getMetaBrowserContext,
+  trackLeadComplete,
+  trackLeadStarted,
+} from "@/lib/meta-pixel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormData = {
@@ -198,15 +204,21 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
     }
   };
 
-  const updateLead = async (id: string, patch: Record<string, unknown>) => {
+  const updateLead = async (
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<Record<string, unknown> | null> => {
     try {
-      await fetch(`/api/leads/${id}`, {
+      const res = await fetch(`/api/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
+      if (!res.ok) return null;
+      return (await res.json()) as Record<string, unknown>;
     } catch {
       // Silently fail — don't block UX for a DB write error
+      return null;
     }
   };
 
@@ -248,7 +260,10 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
     // Step 1 complete → create lead record immediately
     if (step === 1) {
       const id = await createLead(formData.address);
-      if (id) setLeadId(id);
+      if (id) {
+        setLeadId(id);
+        trackLeadStarted("desktop", lang);
+      }
     }
 
     // Step 2 complete → save contact info
@@ -285,9 +300,28 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
   };
 
   const handleSubmit = async () => {
+    const metaEventId = createMetaEventId("lead_desktop");
+    let response: Record<string, unknown> | null = null;
+
     if (leadId) {
-      await updateLead(leadId, { completed: true, step: 4 });
+      response = await updateLead(leadId, {
+        completed: true,
+        step: 4,
+        metaEventId,
+        eventSourceUrl: getMetaBrowserContext()?.eventSourceUrl,
+      });
     }
+
+    trackLeadComplete({
+      eventId:
+        typeof response?.metaEventId === "string"
+          ? response.metaEventId
+          : metaEventId,
+      source: "desktop",
+      lang,
+      leadId,
+    });
+
     setSubmitted(true);
   };
 

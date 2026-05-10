@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import { content, Locale } from "@/lib/content";
+import { trackContactClick } from "@/lib/meta-pixel";
 
 export default function NavMobile({ lang = "en" }: { lang?: Locale }) {
   const c = content[lang].nav;
@@ -38,6 +39,13 @@ export default function NavMobile({ lang = "en" }: { lang?: Locale }) {
 
       <a
         href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}
+        onClick={() =>
+          trackContactClick({
+            location: "mobile_nav",
+            href: `tel:${c.phone.replace(/[^0-9+]/g, "")}`,
+            lang,
+          })
+        }
         className="flex items-center gap-1.5 text-gold/70 hover:text-gold transition-colors"
         style={{ touchAction: "manipulation", minHeight: 44 }}
         aria-label="Call us"

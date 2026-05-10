@@ -1,5 +1,7 @@
 "use client";
 
+import { trackContactClick } from "@/lib/meta-pixel";
+
 export default function Footer() {
   const year = new Date().getFullYear();
 
@@ -51,13 +53,19 @@ export default function Footer() {
             <div className="flex flex-col gap-3">
               {/* Replace with real contact info */}
               <a
-                href="tel:+15550001234"
+                href="tel:+16195470490"
+                onClick={() =>
+                  trackContactClick({
+                    location: "footer",
+                    href: "tel:+16195470490",
+                  })
+                }
                 className="text-cream/45 hover:text-gold font-body text-sm transition-colors duration-200 flex items-center gap-2"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M12.5 9.8l-2-1.9c-.4-.4-1-.4-1.4 0l-.8.8C7.1 8.1 5.9 7 5.3 5.7l.8-.8c.4-.4.4-1 0-1.4L4.2 1.5c-.4-.4-1-.4-1.4 0l-.7.7C1.2 3.1 1.5 5.8 3.6 8c2.1 2.2 4.8 2.4 5.7 1.5l.7-.7c.4-.4.4-1.1.5-.9z" stroke="currentColor" strokeWidth="1.2"/>
                 </svg>
-                (555) 000-1234
+                (619) 547-0490
               </a>
               <a
                 href="mailto:offers@buyyourcasa.com"

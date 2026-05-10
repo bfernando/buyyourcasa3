@@ -3,6 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { content, Locale } from "@/lib/content";
+import {
+  createMetaEventId,
+  getMetaBrowserContext,
+  trackContactClick,
+  trackLeadComplete,
+  trackLeadStarted,
+} from "@/lib/meta-pixel";
 
 /**
  * LeadFormMobile
@@ -188,15 +195,21 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
     }
   };
 
-  const updateLead = async (id: string, patch: Record<string, unknown>) => {
+  const updateLead = async (
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<Record<string, unknown> | null> => {
     try {
-      await fetch(`/api/leads/${id}`, {
+      const res = await fetch(`/api/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
+      if (!res.ok) return null;
+      return (await res.json()) as Record<string, unknown>;
     } catch {
       // Silently fail — don't block UX for a DB write error
+      return null;
     }
   };
 
@@ -226,7 +239,10 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
     // Step 1 complete → create lead record immediately (address captured)
     if (step === 1) {
       const id = await createLead(form.address);
-      if (id) setLeadId(id);
+      if (id) {
+        setLeadId(id);
+        trackLeadStarted("mobile", lang);
+      }
     }
 
     // Steps 2–4 → progressively update the existing record
@@ -260,16 +276,32 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
   };
 
   const submit = async () => {
+    const metaEventId = createMetaEventId("lead_mobile");
+    let response: Record<string, unknown> | null = null;
+
     if (leadId) {
-      await updateLead(leadId, {
+      response = await updateLead(leadId, {
         completed: true,
         step: 5,
         // Catch anything not yet saved
         condition: form.condition,
         timeline: form.timeline,
         reason: form.reason || undefined,
+        metaEventId,
+        eventSourceUrl: getMetaBrowserContext()?.eventSourceUrl,
       });
     }
+
+    trackLeadComplete({
+      eventId:
+        typeof response?.metaEventId === "string"
+          ? response.metaEventId
+          : metaEventId,
+      source: "mobile",
+      lang,
+      leadId,
+    });
+
     setSubmitted(true);
   };
 
@@ -598,7 +630,14 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
 
           {/* Call option on success */}
           <a
-            href="tel:+15550001234"
+            href="tel:+16195470490"
+            onClick={() =>
+              trackContactClick({
+                location: "mobile_form_success",
+                href: "tel:+16195470490",
+                lang,
+              })
+            }
             className="mt-8 flex items-center gap-2 text-gold/70 text-sm font-body hover:text-gold transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

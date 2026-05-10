@@ -11,7 +11,7 @@ export type Locale = "en" | "es";
 export const content = {
   en: {
     nav: {
-      phone: "(555) 000-1234",
+      phone: "(619) 547-0490",
       cta: "Get My Cash Offer",
       links: [
         { label: "How It Works", href: "#how-it-works" },
@@ -332,7 +332,7 @@ export const content = {
   // ─── SPANISH ──────────────────────────────────────────────────────────────
   es: {
     nav: {
-      phone: "(555) 000-1234",
+      phone: "(619) 547-0490",
       cta: "Obtener Mi Oferta",
       links: [
         { label: "Cómo Funciona", href: "#how-it-works" },

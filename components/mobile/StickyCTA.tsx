@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { content, Locale } from "@/lib/content";
+import { trackContactClick } from "@/lib/meta-pixel";
 
 export default function StickyCTA({ lang = "en" }: { lang?: Locale }) {
   const c = content[lang].nav;
@@ -51,6 +52,13 @@ export default function StickyCTA({ lang = "en" }: { lang?: Locale }) {
           <div className="flex items-center gap-3 max-w-sm mx-auto">
             <a
               href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}
+              onClick={() =>
+                trackContactClick({
+                  location: "mobile_sticky_cta",
+                  href: `tel:${c.phone.replace(/[^0-9+]/g, "")}`,
+                  lang,
+                })
+              }
               className="shrink-0 w-12 h-12 rounded-sm border border-surface-border bg-surface flex items-center justify-center text-gold/70 hover:text-gold hover:border-gold/30 transition-colors"
               aria-label="Call us"
               style={{ touchAction: "manipulation" }}

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import MetaPixel from "@/components/MetaPixel";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className="bg-obsidian-900 text-cream antialiased overflow-x-hidden">
+        <MetaPixel />
         {children}
       </body>
     </html>

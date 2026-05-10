@@ -22,6 +22,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
 import { sendLeadCompletionSmsAlert } from "@/lib/sms/lead-alert";
+import {
+  createServerMetaEventId,
+  sendMetaLeadEvent,
+} from "@/lib/meta-capi";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 // Loosely typed — Vapi's payload shape is large and we only read a few fields.
@@ -196,7 +200,11 @@ async function handleSaveDetails(
   return { ok: true, leadId: lead.id };
 }
 
-async function handleCompleteLead(callId: string, source: string) {
+async function handleCompleteLead(
+  callId: string,
+  source: string,
+  metadata?: Record<string, unknown>,
+) {
   const lead = await findOrCreateByCallId(callId, {
     address: "(pending)",
     source,
@@ -207,8 +215,29 @@ async function handleCompleteLead(callId: string, source: string) {
   });
 
   if (!lead.completed && updatedLead.completed) {
-    await sendLeadCompletionAlert(updatedLead);
-    await sendLeadCompletionSmsAlert(updatedLead);
+    const metaEventId =
+      str(metadata?.metaEventId) ??
+      createServerMetaEventId("lead_voice", updatedLead.id);
+    const results = await Promise.allSettled([
+      sendLeadCompletionAlert(updatedLead),
+      sendLeadCompletionSmsAlert(updatedLead),
+      sendMetaLeadEvent({
+        lead: updatedLead,
+        eventId: metaEventId,
+        browser: {
+          eventSourceUrl: str(metadata?.eventSourceUrl),
+          userAgent: str(metadata?.userAgent),
+          fbp: str(metadata?.fbp),
+          fbc: str(metadata?.fbc),
+        },
+      }),
+    ]);
+
+    for (const result of results) {
+      if (result.status === "rejected") {
+        console.error("[vapi webhook] lead completion side effect failed", result.reason);
+      }
+    }
   }
 
   return { ok: true, leadId: lead.id };
@@ -267,8 +296,8 @@ export async function POST(req: NextRequest) {
     if (type === "tool-calls") {
       const m = msg as unknown as ToolCallsMessage;
       const callId = m.call?.id ?? "";
-      const source =
-        (m.call?.metadata?.source as string | undefined) ?? "voice-en";
+      const metadata = m.call?.metadata;
+      const source = (metadata?.source as string | undefined) ?? "voice-en";
       const calls = m.toolCallList ?? m.toolCalls ?? [];
 
       // Vapi expects a `results` array keyed by the tool-call id.
@@ -289,7 +318,7 @@ export async function POST(req: NextRequest) {
             outcome = await handleSaveDetails(callId, source, args);
             break;
           case "complete_lead":
-            outcome = await handleCompleteLead(callId, source);
+            outcome = await handleCompleteLead(callId, source, metadata);
             break;
           default:
             outcome = { ok: false, error: `unknown tool ${call.function.name}` };

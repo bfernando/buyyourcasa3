@@ -28,6 +28,12 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion";
 import Vapi from "@vapi-ai/web";
 import { content, type Locale } from "@/lib/content";
+import {
+  createMetaEventId,
+  getMetaBrowserContext,
+  trackLeadComplete,
+  trackLeadStarted,
+} from "@/lib/meta-pixel";
 import { assistantFor } from "@/lib/vapi/assistants";
 
 type Phase =
@@ -122,6 +128,8 @@ export default function VoiceAgent({
   const optimisticTypedMessagesRef = useRef<string[]>([]);
   const callEndedReasonRef = useRef<string | null>(null);
   const leadCompletedRef = useRef(false);
+  const leadPixelTrackedRef = useRef(false);
+  const voiceLeadEventIdRef = useRef<string | null>(null);
   const manualStopRef = useRef(false);
   const handledCallEndRef = useRef(false);
   const successDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -423,6 +431,16 @@ export default function VoiceAgent({
         for (const call of calls) {
           if (call.function?.name === "complete_lead") {
             leadCompletedRef.current = true;
+            if (!leadPixelTrackedRef.current) {
+              leadPixelTrackedRef.current = true;
+              trackLeadComplete({
+                eventId:
+                  voiceLeadEventIdRef.current ??
+                  createMetaEventId(`lead_voice_${lang}`),
+                source: lang === "es" ? "voice-es" : "voice-en",
+                lang,
+              });
+            }
           }
 
           if (call.function?.name === "save_contact") {
@@ -454,8 +472,10 @@ export default function VoiceAgent({
     clearCallTimers();
     callEndedReasonRef.current = null;
     leadCompletedRef.current = false;
+    leadPixelTrackedRef.current = false;
     manualStopRef.current = false;
     handledCallEndRef.current = false;
+    voiceLeadEventIdRef.current = createMetaEventId(`lead_voice_${lang}`);
     setHasStartedConversation(true);
     setPhase("connecting");
     setTurns(initialMessage ? [{ role: "user", text: initialMessage }] : []);
@@ -463,6 +483,7 @@ export default function VoiceAgent({
     setLeadSummary({});
     pendingTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
     optimisticTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
+    trackLeadStarted(lang === "es" ? "voice-es" : "voice-en", lang);
 
     const vapi = setupVapi();
     if (!vapi) {
@@ -471,8 +492,20 @@ export default function VoiceAgent({
     }
 
     try {
+      const baseAssistant = assistantFor(lang) as Record<string, unknown> & {
+        metadata?: Record<string, unknown>;
+      };
+      const assistant = {
+        ...baseAssistant,
+        metadata: {
+          ...(baseAssistant.metadata ?? {}),
+          ...(getMetaBrowserContext() ?? {}),
+          metaEventId: voiceLeadEventIdRef.current,
+        },
+      };
+
       await vapi.start(
-        assistantFor(lang) as unknown as Parameters<Vapi["start"]>[0],
+        assistant as unknown as Parameters<Vapi["start"]>[0],
       );
     } catch (err) {
       console.error("[VoiceAgent] start failed", err);

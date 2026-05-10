@@ -101,6 +101,31 @@ NEXT_PUBLIC_VAPI_VOICE_ES_MODEL=eleven_turbo_v2_5
 
 If those env vars are omitted, the app falls back to the current built-in ElevenLabs voice IDs.
 
+### Meta Pixel and Conversions API
+Add the Pixel ID in Vercel so Meta receives browser events from the funnel:
+
+```bash
+NEXT_PUBLIC_META_PIXEL_ID=<your-meta-pixel-id>
+META_PIXEL_ID=<your-meta-pixel-id>
+```
+
+The app fires `PageView`, `LeadStarted`, `Lead`, and phone-click `Contact` events. Lead completions use a shared `event_id` so the browser Pixel event can be deduplicated with the server event.
+
+For stronger delivery signals, generate a Conversions API access token in Meta Events Manager and add:
+
+```bash
+META_ACCESS_TOKEN=<your-conversions-api-token>
+META_GRAPH_API_VERSION=v25.0
+```
+
+Optional test mode:
+
+```bash
+META_TEST_EVENT_CODE=<events-manager-test-code>
+```
+
+When `META_ACCESS_TOKEN` is missing, the site still sends browser Pixel events, but server-side CAPI lead events are skipped.
+
 ### Lead Email Notifications
 If you want an internal email alert whenever someone completes the funnel:
 

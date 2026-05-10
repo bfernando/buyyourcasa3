@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
 import { sendLeadCompletionSmsAlert } from "@/lib/sms/lead-alert";
+import {
+  createServerMetaEventId,
+  sendMetaLeadEvent,
+} from "@/lib/meta-capi";
 
 // PATCH /api/leads/:id — progressively update a lead as they complete each step
 export async function PATCH(
@@ -21,6 +25,14 @@ export async function PATCH(
 
     // Strip undefined values so we don't overwrite existing data with nulls
     const data: Record<string, unknown> = {};
+    const metaEventId =
+      typeof body.metaEventId === "string" && body.metaEventId.trim()
+        ? body.metaEventId.trim()
+        : createServerMetaEventId("lead", id);
+    const eventSourceUrl =
+      typeof body.eventSourceUrl === "string" && body.eventSourceUrl.trim()
+        ? body.eventSourceUrl.trim()
+        : undefined;
     const allowed = [
       "phone", "firstName", "lastName", "email",
       "condition", "timeline", "reason",
@@ -40,11 +52,25 @@ export async function PATCH(
     });
 
     if (!existingLead.completed && lead.completed) {
-      await sendLeadCompletionAlert(lead);
-      await sendLeadCompletionSmsAlert(lead);
+      const results = await Promise.allSettled([
+        sendLeadCompletionAlert(lead),
+        sendLeadCompletionSmsAlert(lead),
+        sendMetaLeadEvent({
+          lead,
+          eventId: metaEventId,
+          req,
+          browser: { eventSourceUrl },
+        }),
+      ]);
+
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.error("Lead completion side effect failed", result.reason);
+        }
+      }
     }
 
-    return NextResponse.json(lead);
+    return NextResponse.json({ ...lead, metaEventId });
   } catch (err) {
     console.error("PATCH /api/leads/:id error:", err);
     return NextResponse.json({ error: "Failed to update lead" }, { status: 500 });
