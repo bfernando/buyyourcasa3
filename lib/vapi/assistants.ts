@@ -29,6 +29,16 @@ const DEFAULT_ELEVENLABS_MODELS = {
   es: "eleven_multilingual_v2",
 } as const;
 
+const END_CALL_PHRASES_EN = [
+  "Thanks for reaching out.",
+  "Have a great day.",
+] as const;
+
+const END_CALL_PHRASES_ES = [
+  "Gracias por contactarnos.",
+  "Hasta luego.",
+] as const;
+
 /**
  * Build the absolute URL that Vapi will POST function-tool calls to.
  * In production this must be the public https URL (Vercel). In local dev
@@ -40,6 +50,16 @@ function webhookUrl(): string {
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
     "http://localhost:3000";
   return `${base}/api/vapi/webhook`;
+}
+
+function webhookServer() {
+  const credentialId =
+    process.env.NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID?.trim();
+
+  return {
+    url: webhookUrl(),
+    ...(credentialId ? { credentialId } : {}),
+  };
 }
 
 function voiceIdFor(lang: Locale): string {
@@ -82,8 +102,9 @@ const tools = [
         required: ["address"],
       },
     },
-    // Vapi function-tool server config — where the call lands.
-    server: { url: webhookUrl() },
+    // Vapi function-tool server config. The credential ID points to a Vapi
+    // stored bearer credential; never expose the raw webhook secret here.
+    server: webhookServer(),
     // Don't speak a response for tool calls; just silently save and keep going.
     async: true as const,
   },
@@ -112,7 +133,7 @@ const tools = [
         required: ["firstName", "lastName", "phone"],
       },
     },
-    server: { url: webhookUrl() },
+    server: webhookServer(),
     async: true as const,
   },
   {
@@ -145,7 +166,7 @@ const tools = [
         required: ["condition", "timeline"],
       },
     },
-    server: { url: webhookUrl() },
+    server: webhookServer(),
     async: true as const,
   },
   {
@@ -159,8 +180,11 @@ const tools = [
         properties: {},
       },
     },
-    server: { url: webhookUrl() },
+    server: webhookServer(),
     async: true as const,
+  },
+  {
+    type: "endCall" as const,
   },
 ];
 
@@ -186,6 +210,8 @@ Collect four things, in roughly this order, as quickly and painlessly as possibl
 - If they seem hesitant about any question, reassure them it's optional or that they can skip it.
 - If they correct something, acknowledge it, update your understanding, and call the relevant tool again with the corrected value.
 - Never repeat yourself unnecessarily. Move forward once something is confirmed.
+- If the user seems to be wrapping up, do not keep pushing lead questions. Offer one helpful closing check, like "Of course. Is there anything else I can help you with?" Then wait.
+- If you already offered that closing check and the user says goodbye, no, done, or anything equivalent, end the call. Do not try to get the last word.
 
 ## Tool usage — VERY IMPORTANT
 Call the tools the INSTANT you have the relevant information. Don't wait until the end:
@@ -193,6 +219,7 @@ Call the tools the INSTANT you have the relevant information. Don't wait until t
 - \`save_contact\` — the moment you have name + phone.
 - \`save_details\` — once you have condition + timeline (reason is optional).
 - \`complete_lead\` — right before you say goodbye.
+- \`endCall\` — after your final goodbye, or after the user says goodbye/no/done following your one closing check.
 
 If the user drops off after step 1, we still have their address. Progressive capture matters.
 If you save something and the user later corrects it, call the same tool again immediately with the corrected value.
@@ -201,7 +228,9 @@ If you save something and the user later corrects it, call the same tool again i
 Start by briefly introducing yourself and asking for the property address. Keep the opening under 15 seconds.
 
 ## Closing
-After \`complete_lead\`, say something like: "Perfect — you're all set. Someone from our team will call you within 24 hours with your cash offer. Thanks for reaching out." Then end the call.`;
+After \`complete_lead\`, say: "Perfect — you're all set. Someone from our team will call you within 24 hours with your cash offer. Thanks for reaching out." Then use the \`endCall\` tool.
+
+If the user seems to be wrapping up before all details are collected, say one short closing check such as: "Of course. Is there anything else I can help you with?" If they then say no, bye, done, or anything equivalent, say "Thanks for reaching out." and use the \`endCall\` tool. Do not ask another lead-capture question after they are trying to close.`;
 
 const SYSTEM_PROMPT_ES = `Eres un representante cálido y profesional de Mi Casa Investment Group, una empresa local que hace ofertas justas en efectivo por casas. Estás atendiendo una llamada de voz en el navegador de alguien que podría querer vender su casa.
 
@@ -224,6 +253,8 @@ Recolectar cuatro cosas, más o menos en este orden, de la forma más rápida y 
 - Si corrigen algo, reconócelo, actualiza tu entendimiento y vuelve a llamar la herramienta correspondiente con el dato corregido.
 - Nunca te repitas de más. Avanza una vez que el dato quede confirmado.
 - Si el usuario mezcla inglés y español, síguele la corriente en el idioma que use — pero tu idioma por defecto es español.
+- Si el usuario parece estar cerrando la conversación, no sigas presionando con preguntas del lead. Ofrece una sola frase útil de cierre, como "Claro. Si hay algo más en lo que te pueda ayudar, aquí estoy." o "Claro, ¿hay algo más en lo que te pueda ayudar?" Luego espera.
+- Si ya ofreciste esa frase de cierre y el usuario dice adiós, no, ya terminé, listo, o algo equivalente, finaliza la llamada. No intentes quedarte con la última palabra.
 
 ## Uso de herramientas — MUY IMPORTANTE
 Llama a las herramientas EN EL INSTANTE en que tengas la información relevante. No esperes al final:
@@ -231,6 +262,7 @@ Llama a las herramientas EN EL INSTANTE en que tengas la información relevante.
 - \`save_contact\` — en el momento en que tengas nombre + teléfono.
 - \`save_details\` — una vez que tengas condición + plazo (la razón es opcional).
 - \`complete_lead\` — justo antes de despedirte.
+- \`endCall\` — después de tu despedida final, o después de que el usuario diga adiós/no/listo/ya terminé tras tu única frase de cierre.
 
 Si el usuario se desconecta después del paso 1, al menos tenemos su dirección. La captura progresiva importa.
 Si guardas algo y el usuario luego lo corrige, vuelve a llamar de inmediato la misma herramienta con el valor correcto.
@@ -239,7 +271,9 @@ Si guardas algo y el usuario luego lo corrige, vuelve a llamar de inmediato la m
 Preséntate brevemente y pregunta por la dirección de la propiedad. Apertura de menos de 15 segundos.
 
 ## Cierre
-Después de \`complete_lead\`, di algo como: "Perfecto — todo listo. Alguien de nuestro equipo te llamará dentro de 24 horas con tu oferta en efectivo. Gracias por contactarnos." Luego finaliza la llamada.`;
+Después de \`complete_lead\`, di: "Perfecto — todo listo. Alguien de nuestro equipo te llamará dentro de 24 horas con tu oferta en efectivo. Gracias por contactarnos." Luego usa la herramienta \`endCall\`.
+
+Si el usuario parece estar cerrando antes de recolectar todos los datos, di una sola frase de cierre, por ejemplo: "Claro. Si hay algo más en lo que te pueda ayudar, aquí estoy." o, si encaja mejor, "Claro, ¿hay algo más en lo que te pueda ayudar?" Si después dice no, adiós, listo, ya terminé, o algo equivalente, di "Gracias por contactarnos." y usa la herramienta \`endCall\`. No vuelvas a hacer preguntas de captura de lead después de que intente cerrar.`;
 
 // ─── First messages (spoken the moment the call connects) ──────────────────
 
@@ -294,6 +328,7 @@ function buildAssistant(lang: Locale) {
 
     firstMessage: isEs ? FIRST_MESSAGE_ES : FIRST_MESSAGE_EN,
     firstMessageMode: "assistant-speaks-first" as const,
+    endCallPhrases: isEs ? END_CALL_PHRASES_ES : END_CALL_PHRASES_EN,
 
     // ── Durations & behavior
     maxDurationSeconds: 600,

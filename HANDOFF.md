@@ -110,6 +110,7 @@ Four vars, Production + Preview environments:
 | Name | Value | Public? |
 |---|---|---|
 | `NEXT_PUBLIC_VAPI_PUBLIC_KEY` | Set from your local `.env.local` / Vercel env | Yes — ships in browser bundle |
+| `NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID` | Vapi webhook credential ID for `VAPI_WEBHOOK_SECRET` | Yes — ID only, not the secret |
 | `VAPI_PRIVATE_KEY` | Set from your local `.env.local` / Vercel env | No — server only |
 | `VAPI_WEBHOOK_SECRET` | Set from your local `.env.local` / Vercel env | No — server only |
 | `NEXT_PUBLIC_SITE_URL` | `https://buyyourcasa3.vercel.app` | Yes — used to build webhook URLs |
@@ -118,6 +119,7 @@ CLI version:
 ```bash
 npx vercel link
 npx vercel env add NEXT_PUBLIC_VAPI_PUBLIC_KEY production
+npx vercel env add NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID production
 npx vercel env add VAPI_PRIVATE_KEY production
 npx vercel env add VAPI_WEBHOOK_SECRET production
 npx vercel env add NEXT_PUBLIC_SITE_URL production
@@ -129,8 +131,11 @@ npx vercel env add NEXT_PUBLIC_VAPI_PUBLIC_KEY preview
 **`NEXT_PUBLIC_SITE_URL` is the load-bearing one.** `lib/vapi/assistants.ts` calls `webhookUrl()` at module evaluation time to build the absolute URL for each tool's `server.url`. If it's pointing at `localhost`, Vapi's servers can't reach your tools and you'll see the assistant talk but nothing saves.
 Do not store live secrets in this handoff document. Rotate any credentials that were previously pasted here.
 
-### 5. Vapi dashboard: server URL secret
-Log into the Vapi dashboard → Org Settings → Server URL. Paste the `VAPI_WEBHOOK_SECRET` value into the secret field so Vapi attaches it as `x-vapi-secret` on every outbound webhook. (Alternatively, the inline assistant config sends `serverUrlSecret` per call — this is already wired in `lib/vapi/assistants.ts` via `server.secret`, but the dashboard fallback is belt-and-suspenders.)
+### 5. Vapi webhook credential
+
+Create a Vapi webhook credential with bearer auth where the token is the same value as `VAPI_WEBHOOK_SECRET`. Put the returned credential ID in `NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID`. The browser assistant config sends only the credential ID in each tool's `server.credentialId`; Vapi stores and sends the secret server-side.
+
+The webhook also accepts `x-vapi-secret` for dashboard-level server settings, but do not put the raw secret in `NEXT_PUBLIC_*` env vars or client-side assistant config.
 
 ### 6. Local testing before deploy
 Vapi can't reach `localhost`. Use a tunnel:
@@ -169,8 +174,8 @@ ngrok http 3000
 |---|---|
 | Overlay doesn't show | `<VoiceAgent>` prop `shellMode` defaults to true; confirm parent page passes it. Check `overlayDismissed` state isn't stuck true. |
 | Mic prompt doesn't appear | Browser blocked it silently — check site settings. The `mic-blocked` branch of the state machine nudges the user but can't force the prompt to re-appear (browser policy). |
-| Assistant talks but nothing saves to DB | `NEXT_PUBLIC_SITE_URL` is wrong or Vapi can't reach it. Hit `https://<your-url>/api/vapi/webhook` in a browser — should return `{"ok":true,"service":"vapi-webhook"}`. |
-| Webhook returns 401 | `VAPI_WEBHOOK_SECRET` mismatch between `.env` and Vapi dashboard, or the header isn't being sent (check request logs). |
+| Assistant talks but nothing saves to DB | `NEXT_PUBLIC_SITE_URL` is wrong, Vapi can't reach it, or `NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID` is missing. Hit `https://<your-url>/api/vapi/webhook` in a browser — should return `{"ok":true,"service":"vapi-webhook"}`. |
+| Webhook returns 401 | `VAPI_WEBHOOK_SECRET` mismatch, `NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID` is missing/wrong, or Vapi is not sending auth headers. Check Vercel logs for the non-secret `[vapi webhook] unauthorized` diagnostic. |
 | Partial transcript flickers | Expected — we merge `transcriptType: "partial"` events into the current turn and commit on `final`. See `onMessage` in `VoiceAgent.tsx`. |
 | Spanish assistant speaks English | Check `assistantFor(lang)` is getting `"es"` — page component must pass `lang="es"` to `<VoiceAgent>`. Deepgram `language: "es"` must also be set in the assistant config. |
 | Call drops at ~10 min | `maxDurationSeconds: 600` in the assistant config. Raise if needed. |

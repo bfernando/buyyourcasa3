@@ -86,6 +86,49 @@ function normalizeMessageText(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function normalizedForIntent(value: string) {
+  return normalizeMessageText(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9ñ\s']/gi, "");
+}
+
+function isWrapUpReply(value: string) {
+  const text = normalizedForIntent(value);
+  if (!text) return false;
+
+  return (
+    /\b(bye|goodbye|see you|talk to you later|i'?m done|all done|that'?s all|nothing else|no thanks|no thank you)\b/i.test(
+      text,
+    ) ||
+    /\b(adios|hasta luego|nos vemos|ya termine|ya terminamos|listo|nada mas|no gracias|eso es todo)\b/i.test(
+      text,
+    ) ||
+    /^(no|nope|nah|done|listo|adios|bye)$/i.test(text)
+  );
+}
+
+function isAssistantClosingCheck(value: string) {
+  const text = normalizedForIntent(value);
+
+  return (
+    /\b(anything else|something else|else i can help|here if you need)\b/i.test(
+      text,
+    ) ||
+    /\b(algo mas|pueda ayudar|puedo ayudar|aqui estoy)\b/i.test(text)
+  );
+}
+
+function isAssistantFinalFarewell(value: string) {
+  const text = normalizedForIntent(value);
+
+  return (
+    /\b(thanks for reaching out|have a great day|goodbye)\b/i.test(text) ||
+    /\b(gracias por contactarnos|hasta luego|que tengas buen dia)\b/i.test(text)
+  );
+}
+
 function cleanSummaryValue(value?: string) {
   if (!value || value === "(pending)") return undefined;
   return value;
@@ -132,7 +175,10 @@ export default function VoiceAgent({
   const leadPixelTrackedRef = useRef(false);
   const voiceLeadEventIdRef = useRef<string | null>(null);
   const manualStopRef = useRef(false);
+  const gracefulStopRef = useRef(false);
   const handledCallEndRef = useRef(false);
+  const assistantOfferedClosingRef = useRef(false);
+  const assistantFinalFarewellRef = useRef(false);
   const successDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -220,7 +266,17 @@ export default function VoiceAgent({
         return;
       }
 
-      if (manualStopRef.current || reason === "customer-ended-call") {
+      const gracefulAssistantEnd =
+        reason === "assistant-ended-call" ||
+        reason === "assistant-ended-call-after-message-spoken" ||
+        reason === "assistant-said-end-call-phrase";
+
+      if (
+        manualStopRef.current ||
+        gracefulStopRef.current ||
+        gracefulAssistantEnd ||
+        reason === "customer-ended-call"
+      ) {
         setPhase("idle");
         setHasStartedConversation(false);
         setTurns([]);
@@ -337,7 +393,14 @@ export default function VoiceAgent({
     });
 
     vapi.on("speech-start", () => setPhase("speaking"));
-    vapi.on("speech-end", () => setPhase("listening"));
+    vapi.on("speech-end", () => {
+      setPhase("listening");
+
+      if (assistantFinalFarewellRef.current) {
+        gracefulStopRef.current = true;
+        vapi.stop();
+      }
+    });
 
     vapi.on("volume-level", (v: number) => setVolume(v));
 
@@ -381,9 +444,27 @@ export default function VoiceAgent({
           | "final"
           | undefined;
         if (!text) return;
+        const normalizedText = normalizeMessageText(text);
+
+        if (transcriptType === "final") {
+          if (role === "assistant") {
+            if (isAssistantClosingCheck(text)) {
+              assistantOfferedClosingRef.current = true;
+            }
+
+            if (isAssistantFinalFarewell(text)) {
+              assistantFinalFarewellRef.current = true;
+            }
+          } else if (
+            assistantOfferedClosingRef.current &&
+            isWrapUpReply(text)
+          ) {
+            gracefulStopRef.current = true;
+            vapi.stop();
+          }
+        }
 
         setTurns((prev) => {
-          const normalizedText = normalizeMessageText(text);
           const optimisticText = optimisticTypedMessagesRef.current[0];
           // Merge partials: if the last turn is the same role and partial,
           // replace its text; otherwise append a new turn.
@@ -475,7 +556,10 @@ export default function VoiceAgent({
     leadCompletedRef.current = false;
     leadPixelTrackedRef.current = false;
     manualStopRef.current = false;
+    gracefulStopRef.current = false;
     handledCallEndRef.current = false;
+    assistantOfferedClosingRef.current = false;
+    assistantFinalFarewellRef.current = false;
     voiceLeadEventIdRef.current = createMetaEventId(`lead_voice_${lang}`);
     setHasStartedConversation(true);
     setPhase("connecting");

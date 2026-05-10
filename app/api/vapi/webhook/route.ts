@@ -13,9 +13,9 @@
  *
  * Security: Vapi sends every request with a header that must match
  * VAPI_WEBHOOK_SECRET. Any request that doesn't match is rejected with 401.
- * The same secret value must be set in the assistant's `serverSecret` field
- * (we pass it via the assistant config when creating the call client-side —
- * but for the POC we rely purely on the header match).
+ * For browser-created calls, the assistant config passes a Vapi webhook
+ * credential ID; the raw secret stays in Vapi/Vercel and is never exposed to
+ * the browser.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -65,23 +65,46 @@ type EndOfCallMessage = {
 
 // Loose envelope for "any Vapi message" — we narrow by `type` before use.
 type VapiMessage = { type?: string } & Record<string, unknown>;
+type SecretVerification =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: string;
+      hasExpectedSecret: boolean;
+      hasVapiSecretHeader: boolean;
+      hasAuthorizationHeader: boolean;
+    };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-function verifySecret(req: NextRequest): boolean {
+function verifySecret(req: NextRequest): SecretVerification {
   const expected = process.env.VAPI_WEBHOOK_SECRET;
   if (!expected) {
     // No secret set — allow in dev so you can test without the header.
     // In production, you MUST set VAPI_WEBHOOK_SECRET.
-    if (process.env.NODE_ENV === "production") return false;
-    return true;
+    if (process.env.NODE_ENV === "production") {
+      return {
+        ok: false,
+        reason: "missing_expected_secret",
+        hasExpectedSecret: false,
+        hasVapiSecretHeader: Boolean(req.headers.get("x-vapi-secret")),
+        hasAuthorizationHeader: Boolean(req.headers.get("authorization")),
+      };
+    }
+    return { ok: true };
   }
-  // Vapi sends the secret in x-vapi-secret when you set the
-  // server.secret field. We also accept a raw Authorization: Bearer fallback.
+  // Vapi may send either x-vapi-secret from dashboard-level server settings or
+  // Authorization: Bearer from a stored webhook credential.
   const headerA = req.headers.get("x-vapi-secret");
   const headerB = req.headers.get("authorization");
-  if (headerA && headerA === expected) return true;
-  if (headerB && headerB === `Bearer ${expected}`) return true;
-  return false;
+  if (headerA && headerA === expected) return { ok: true };
+  if (headerB && headerB === `Bearer ${expected}`) return { ok: true };
+  return {
+    ok: false,
+    reason: "secret_mismatch",
+    hasExpectedSecret: true,
+    hasVapiSecretHeader: Boolean(headerA),
+    hasAuthorizationHeader: Boolean(headerB),
+  };
 }
 
 function parseArgs(
@@ -273,7 +296,9 @@ async function handleEndOfCall(msg: EndOfCallMessage) {
 
 // ─── Route handler ────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  if (!verifySecret(req)) {
+  const secretVerification = verifySecret(req);
+  if (!secretVerification.ok) {
+    console.warn("[vapi webhook] unauthorized", secretVerification);
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

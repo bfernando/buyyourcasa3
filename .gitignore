@@ -14,3 +14,4 @@ Thumbs.db
 /app/generated/prisma
 
 tsconfig.tsbuildinfo
+.env*.local
