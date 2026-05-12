@@ -188,6 +188,7 @@ function sanitizeError(error: unknown) {
         typeof record.name === "string"
           ? record.name.slice(0, 120)
           : undefined,
+      description: String(error).slice(0, 500),
       message:
         typeof record.message === "string"
           ? record.message.slice(0, 500)
@@ -200,6 +201,7 @@ function sanitizeError(error: unknown) {
         typeof record.status === "string" || typeof record.status === "number"
           ? record.status
           : undefined,
+      keys: Object.keys(record).slice(0, 20),
     };
   }
 
@@ -599,6 +601,9 @@ export default function VoiceAgent({
           error: sanitizeError(err),
           connected: callConnectedRef.current,
           endedReason: callEndedReasonRef.current,
+          elapsedMs: callStartedAtRef.current
+            ? Date.now() - callStartedAtRef.current
+            : undefined,
         },
       );
     });
