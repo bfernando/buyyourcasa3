@@ -875,6 +875,14 @@ export default function VoiceAgent({
     setMuted(next);
   }, [muted]);
 
+  const showFallbackForm = useCallback(
+    (reason: string) => {
+      reportClientEvent("voice_fallback_form_selected", { reason });
+      setShowFallback(true);
+    },
+    [reportClientEvent],
+  );
+
   // ─── Cleanup on unmount ──────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -1200,8 +1208,10 @@ export default function VoiceAgent({
                 </button>
                 {fallbackForm && (
                   <button
-                    onClick={() => setShowFallback(true)}
-                    className="text-cream/40 hover:text-cream/70 font-body text-xs underline decoration-cream/15 underline-offset-4 transition-colors"
+                    onClick={() =>
+                      showFallbackForm(errorCode ?? "microphone_unavailable")
+                    }
+                    className="px-8 py-3.5 rounded-sm border border-cream/25 hover:border-gold/50 text-cream/80 hover:text-cream font-body text-sm transition-colors"
                   >
                     {c.micBlockedFallback}
                   </button>
@@ -1231,8 +1241,8 @@ export default function VoiceAgent({
                 </button>
                 {fallbackForm && (
                   <button
-                    onClick={() => setShowFallback(true)}
-                    className="text-cream/40 hover:text-cream/70 font-body text-xs underline decoration-cream/15 underline-offset-4 transition-colors"
+                    onClick={() => showFallbackForm(errorCode ?? "voice_error")}
+                    className="px-8 py-3.5 rounded-sm border border-cream/25 hover:border-gold/50 text-cream/80 hover:text-cream font-body text-sm transition-colors"
                   >
                     {c.fallbackLink}
                   </button>
