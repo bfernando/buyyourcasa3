@@ -49,6 +49,7 @@ type Phase =
 
 type VoiceErrorCode =
   | "missing_public_key"
+  | "no_microphone_found"
   | "microphone_blocked"
   | "vapi_start_failed"
   | "vapi_runtime_error"
@@ -173,6 +174,27 @@ function isMicrophoneError(value: string) {
   );
 }
 
+function isNoMicrophoneError(value: string) {
+  return /notfound|not found|no microphone|no audio|audioinput|device not found|devicesnotfound/i.test(
+    value,
+  );
+}
+
+async function hasAvailableMicrophone() {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+    return true;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.some((device) => device.kind === "audioinput");
+  } catch {
+    // Some browsers hide device labels/listing until permission is requested.
+    // Let Vapi/getUserMedia surface the real browser permission or device error.
+    return true;
+  }
+}
+
 function sanitizeError(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -213,6 +235,8 @@ function voiceErrorMessage(code: VoiceErrorCode | null, lang: Locale) {
     en: {
       missing_public_key:
         "The voice service is missing its browser key. Please use the form while we fix it.",
+      no_microphone_found:
+        "No microphone was found. Connect or enable a microphone, then refresh and try again.",
       microphone_blocked:
         "Your browser blocked the microphone. Allow microphone access, refresh, and try again.",
       vapi_start_failed:
@@ -231,6 +255,8 @@ function voiceErrorMessage(code: VoiceErrorCode | null, lang: Locale) {
     es: {
       missing_public_key:
         "Al servicio de voz le falta su clave del navegador. Usa el formulario mientras lo corregimos.",
+      no_microphone_found:
+        "No se encontró ningún micrófono. Conecta o activa un micrófono, recarga la página e intenta de nuevo.",
       microphone_blocked:
         "Tu navegador bloqueó el micrófono. Permite el acceso, recarga la página e intenta de nuevo.",
       vapi_start_failed:
@@ -596,7 +622,11 @@ export default function VoiceAgent({
       // Daily / Vapi surface mic-permission failures as generic errors.
       // Detect the common shapes and route to the mic-blocked screen.
       enterErrorState(
-        isMicrophoneError(msg) ? "microphone_blocked" : "vapi_runtime_error",
+        isNoMicrophoneError(msg)
+          ? "no_microphone_found"
+          : isMicrophoneError(msg)
+            ? "microphone_blocked"
+            : "vapi_runtime_error",
         {
           error: sanitizeError(err),
           connected: callConnectedRef.current,
@@ -787,6 +817,14 @@ export default function VoiceAgent({
       hasInitialTypedMessage: Boolean(initialMessage),
     });
 
+    const microphoneAvailable = await hasAvailableMicrophone();
+    if (!microphoneAvailable) {
+      enterErrorState("no_microphone_found", {
+        browserMediaDevices: Boolean(navigator.mediaDevices),
+      });
+      return;
+    }
+
     const vapi = setupVapi();
     if (!vapi) {
       enterErrorState("missing_public_key");
@@ -813,7 +851,11 @@ export default function VoiceAgent({
       console.error("[VoiceAgent] start failed", err);
       const msg = err instanceof Error ? err.message : String(err);
       enterErrorState(
-        isMicrophoneError(msg) ? "microphone_blocked" : "vapi_start_failed",
+        isNoMicrophoneError(msg)
+          ? "no_microphone_found"
+          : isMicrophoneError(msg)
+            ? "microphone_blocked"
+            : "vapi_start_failed",
         { error: sanitizeError(err) },
       );
     }
