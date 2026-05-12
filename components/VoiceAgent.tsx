@@ -47,6 +47,16 @@ type Phase =
   | "error"
   | "success";
 
+type VoiceErrorCode =
+  | "missing_public_key"
+  | "microphone_blocked"
+  | "vapi_start_failed"
+  | "vapi_runtime_error"
+  | "send_typed_message_failed"
+  | "send_queued_message_failed"
+  | "call_ended_early"
+  | "unknown_call_end";
+
 type Turn = {
   role: "user" | "assistant";
   text: string;
@@ -156,6 +166,90 @@ function formatSummaryEnum(
   return labels[cleanValue] ?? cleanValue.replace(/_/g, " ");
 }
 
+function isMicrophoneError(value: string) {
+  return (
+    /permission|denied|notallowed|microphone|getusermedia/i.test(value) ||
+    value.includes("NotAllowedError")
+  );
+}
+
+function sanitizeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message.slice(0, 500),
+    };
+  }
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    return {
+      name:
+        typeof record.name === "string"
+          ? record.name.slice(0, 120)
+          : undefined,
+      message:
+        typeof record.message === "string"
+          ? record.message.slice(0, 500)
+          : undefined,
+      code:
+        typeof record.code === "string"
+          ? record.code.slice(0, 120)
+          : undefined,
+      status:
+        typeof record.status === "string" || typeof record.status === "number"
+          ? record.status
+          : undefined,
+    };
+  }
+
+  return { message: String(error).slice(0, 500) };
+}
+
+function voiceErrorMessage(code: VoiceErrorCode | null, lang: Locale) {
+  const messages = {
+    en: {
+      missing_public_key:
+        "The voice service is missing its browser key. Please use the form while we fix it.",
+      microphone_blocked:
+        "Your browser blocked the microphone. Allow microphone access, refresh, and try again.",
+      vapi_start_failed:
+        "The voice service did not start. Please try again, or use the form if it keeps happening.",
+      vapi_runtime_error:
+        "The voice service disconnected unexpectedly. Please try again, or use the form.",
+      send_typed_message_failed:
+        "Your typed reply could not be sent to the voice assistant. Please try again.",
+      send_queued_message_failed:
+        "Your typed reply could not be sent after the call connected. Please try again.",
+      call_ended_early:
+        "The call ended before the conversation started. Please try again, or use the form.",
+      unknown_call_end:
+        "The call ended unexpectedly. Please try again, or use the form.",
+    },
+    es: {
+      missing_public_key:
+        "Al servicio de voz le falta su clave del navegador. Usa el formulario mientras lo corregimos.",
+      microphone_blocked:
+        "Tu navegador bloqueó el micrófono. Permite el acceso, recarga la página e intenta de nuevo.",
+      vapi_start_failed:
+        "El servicio de voz no inició. Intenta de nuevo, o usa el formulario si sigue pasando.",
+      vapi_runtime_error:
+        "El servicio de voz se desconectó inesperadamente. Intenta de nuevo, o usa el formulario.",
+      send_typed_message_failed:
+        "No se pudo enviar tu respuesta escrita al asistente. Intenta de nuevo.",
+      send_queued_message_failed:
+        "No se pudo enviar tu respuesta escrita después de conectar la llamada. Intenta de nuevo.",
+      call_ended_early:
+        "La llamada terminó antes de iniciar la conversación. Intenta de nuevo, o usa el formulario.",
+      unknown_call_end:
+        "La llamada terminó inesperadamente. Intenta de nuevo, o usa el formulario.",
+    },
+  } satisfies Record<Locale, Record<VoiceErrorCode, string>>;
+
+  if (!code) return undefined;
+  return messages[lang][code];
+}
+
 export default function VoiceAgent({
   lang = "en",
   shellMode = true,
@@ -177,12 +271,16 @@ export default function VoiceAgent({
   );
   const [typedInput, setTypedInput] = useState("");
   const [leadSummary, setLeadSummary] = useState<LeadSummary>({});
+  const [errorCode, setErrorCode] = useState<VoiceErrorCode | null>(null);
 
   const vapiRef = useRef<Vapi | null>(null);
+  const phaseRef = useRef<Phase>("idle");
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const pendingTypedMessagesRef = useRef<string[]>([]);
   const optimisticTypedMessagesRef = useRef<string[]>([]);
   const callEndedReasonRef = useRef<string | null>(null);
+  const callStartedAtRef = useRef<number | null>(null);
+  const callConnectedRef = useRef(false);
   const leadCompletedRef = useRef(false);
   const leadPixelTrackedRef = useRef(false);
   const voiceLeadEventIdRef = useRef<string | null>(null);
@@ -197,6 +295,49 @@ export default function VoiceAgent({
   );
   const callEndFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
+  );
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  const reportClientEvent = useCallback(
+    (event: string, details?: Record<string, unknown>) => {
+      const payload = {
+        event,
+        source: "voice-agent",
+        lang,
+        phase: phaseRef.current,
+        path:
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : undefined,
+        eventId: voiceLeadEventIdRef.current,
+        timestamp: new Date().toISOString(),
+        userAgent:
+          typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        details,
+      };
+
+      void fetch("/api/client-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch((error) => {
+        console.warn("[VoiceAgent] client event report failed", error);
+      });
+    },
+    [lang],
+  );
+
+  const enterErrorState = useCallback(
+    (code: VoiceErrorCode, details?: Record<string, unknown>) => {
+      setErrorCode(code);
+      setPhase(code === "microphone_blocked" ? "mic-blocked" : "error");
+      reportClientEvent(`voice_error_${code}`, details);
+    },
+    [reportClientEvent],
   );
 
   // ─── Body-scroll lock while the overlay is mounted ──────────────────────
@@ -232,11 +373,13 @@ export default function VoiceAgent({
       } catch (error) {
         console.error("[VoiceAgent] send queued typed message failed", error);
         pendingTypedMessagesRef.current.unshift(message);
-        setPhase("error");
+        enterErrorState("send_queued_message_failed", {
+          error: sanitizeError(error),
+        });
         break;
       }
     }
-  }, []);
+  }, [enterErrorState]);
 
   const clearCallTimers = useCallback(() => {
     if (successDismissTimeoutRef.current) {
@@ -269,7 +412,7 @@ export default function VoiceAgent({
         reason === "customer-did-not-give-microphone-permission" ||
         reason === "call.in-progress.error-assistant-did-not-receive-customer-audio"
       ) {
-        setPhase("mic-blocked");
+        enterErrorState("microphone_blocked", { endedReason: reason });
         return;
       }
 
@@ -300,9 +443,19 @@ export default function VoiceAgent({
         return;
       }
 
-      setPhase("error");
+      const elapsedMs = callStartedAtRef.current
+        ? Date.now() - callStartedAtRef.current
+        : undefined;
+      enterErrorState(
+        callConnectedRef.current ? "unknown_call_end" : "call_ended_early",
+        {
+          endedReason: reason,
+          elapsedMs,
+          connected: callConnectedRef.current,
+        },
+      );
     },
-    [onDismiss],
+    [enterErrorState, onDismiss],
   );
 
   const syncLeadSummary = useCallback(
@@ -389,6 +542,7 @@ export default function VoiceAgent({
       console.error(
         "[VoiceAgent] NEXT_PUBLIC_VAPI_PUBLIC_KEY is not set — add it to .env.local",
       );
+      reportClientEvent("voice_missing_public_key");
       return null;
     }
 
@@ -396,10 +550,23 @@ export default function VoiceAgent({
     vapiRef.current = vapi;
 
     vapi.on("call-start", () => {
+      callConnectedRef.current = true;
+      reportClientEvent("voice_call_started", {
+        elapsedMs: callStartedAtRef.current
+          ? Date.now() - callStartedAtRef.current
+          : undefined,
+      });
       setPhase("listening");
     });
 
     vapi.on("call-end", () => {
+      reportClientEvent("voice_call_end_event", {
+        endedReason: callEndedReasonRef.current,
+        connected: callConnectedRef.current,
+        elapsedMs: callStartedAtRef.current
+          ? Date.now() - callStartedAtRef.current
+          : undefined,
+      });
       callEndFallbackTimeoutRef.current = setTimeout(() => {
         finishCall(
           callEndedReasonRef.current ??
@@ -426,14 +593,14 @@ export default function VoiceAgent({
       const msg = err instanceof Error ? err.message : String(err);
       // Daily / Vapi surface mic-permission failures as generic errors.
       // Detect the common shapes and route to the mic-blocked screen.
-      if (
-        /permission|denied|notallowed|microphone|getusermedia/i.test(msg) ||
-        msg.includes("NotAllowedError")
-      ) {
-        setPhase("mic-blocked");
-      } else {
-        setPhase("error");
-      }
+      enterErrorState(
+        isMicrophoneError(msg) ? "microphone_blocked" : "vapi_runtime_error",
+        {
+          error: sanitizeError(err),
+          connected: callConnectedRef.current,
+          endedReason: callEndedReasonRef.current,
+        },
+      );
     });
 
     vapi.on("message", (msg: Record<string, unknown>) => {
@@ -445,6 +612,12 @@ export default function VoiceAgent({
         if (endedReason) {
           callEndedReasonRef.current = endedReason;
         }
+
+        reportClientEvent("voice_status_update", {
+          status,
+          endedReason,
+          connected: callConnectedRef.current,
+        });
 
         if (status === "ended") {
           finishCall(endedReason);
@@ -530,6 +703,11 @@ export default function VoiceAgent({
             function?: { name?: string; arguments?: unknown };
           }>) ||
           [];
+        reportClientEvent("voice_tool_calls", {
+          names: calls
+            .map((call) => call.function?.name)
+            .filter((name): name is string => Boolean(name)),
+        });
         syncLeadSummary(calls);
         for (const call of calls) {
           if (call.function?.name === "complete_lead") {
@@ -566,7 +744,13 @@ export default function VoiceAgent({
     });
 
     return vapi;
-  }, [finishCall, flushPendingTypedMessages, syncLeadSummary]);
+  }, [
+    enterErrorState,
+    finishCall,
+    flushPendingTypedMessages,
+    reportClientEvent,
+    syncLeadSummary,
+  ]);
 
   // ─── Start the call (one-tap) ────────────────────────────────────────────
   const startCall = useCallback(async (initialTypedMessage?: string) => {
@@ -574,6 +758,9 @@ export default function VoiceAgent({
 
     clearCallTimers();
     callEndedReasonRef.current = null;
+    callStartedAtRef.current = Date.now();
+    callConnectedRef.current = false;
+    setErrorCode(null);
     leadCompletedRef.current = false;
     leadPixelTrackedRef.current = false;
     manualStopRef.current = false;
@@ -591,10 +778,13 @@ export default function VoiceAgent({
     pendingTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
     optimisticTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
     trackLeadStarted(lang === "es" ? "voice-es" : "voice-en", lang);
+    reportClientEvent("voice_start_attempt", {
+      hasInitialTypedMessage: Boolean(initialMessage),
+    });
 
     const vapi = setupVapi();
     if (!vapi) {
-      setPhase("error");
+      enterErrorState("missing_public_key");
       return;
     }
 
@@ -617,16 +807,12 @@ export default function VoiceAgent({
     } catch (err) {
       console.error("[VoiceAgent] start failed", err);
       const msg = err instanceof Error ? err.message : String(err);
-      if (
-        /permission|denied|notallowed|microphone|getusermedia/i.test(msg) ||
-        msg.includes("NotAllowedError")
-      ) {
-        setPhase("mic-blocked");
-      } else {
-        setPhase("error");
-      }
+      enterErrorState(
+        isMicrophoneError(msg) ? "microphone_blocked" : "vapi_start_failed",
+        { error: sanitizeError(err) },
+      );
     }
-  }, [clearCallTimers, setupVapi, lang]);
+  }, [clearCallTimers, enterErrorState, reportClientEvent, setupVapi, lang]);
 
   // ─── Stop the call manually ──────────────────────────────────────────────
   const endCall = useCallback(() => {
@@ -744,7 +930,9 @@ export default function VoiceAgent({
         } catch (error) {
           console.error("[VoiceAgent] send typed message failed", error);
           setTypedInput(nextMessage);
-          setPhase("error");
+          enterErrorState("send_typed_message_failed", {
+            error: sanitizeError(error),
+          });
         }
         return;
       }
@@ -762,7 +950,7 @@ export default function VoiceAgent({
 
       await startCall(nextMessage);
     },
-    [phase, startCall, typedInput],
+    [enterErrorState, phase, startCall, typedInput],
   );
   const handleStartCall = useCallback(() => {
     void startCall();
@@ -988,7 +1176,7 @@ export default function VoiceAgent({
                 {c.errorTitle}
               </h2>
               <p className="text-cream/55 font-body text-sm leading-relaxed mb-8">
-                {c.errorSub}
+                {voiceErrorMessage(errorCode, lang) ?? c.errorSub}
               </p>
               <div className="flex flex-col items-center gap-4">
                 <button onClick={handleStartCall} className="btn-gold px-8 py-3.5 rounded-sm text-sm">
