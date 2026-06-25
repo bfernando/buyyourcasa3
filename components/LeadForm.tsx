@@ -9,6 +9,10 @@ import {
   trackLeadComplete,
   trackLeadStarted,
 } from "@/lib/meta-pixel";
+import {
+  getAttributedLeadSource,
+  getPropertyAcquisitionAttribution,
+} from "@/lib/property-acquisition-attribution-client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormData = {
@@ -189,16 +193,20 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
   };
 
   // ─── Progressive capture helpers ──────────────────────────────────────────
-  const createLead = async (address: string): Promise<string | null> => {
+  const createLead = async (
+    address: string,
+  ): Promise<{ id: string; source: string } | null> => {
     try {
+      const attribution = getPropertyAcquisitionAttribution(lang);
+      const source = getAttributedLeadSource("desktop", attribution);
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, source: "desktop" }),
+        body: JSON.stringify({ address, source, attribution }),
       });
       if (!res.ok) return null;
       const data = await res.json();
-      return data.id as string;
+      return { id: data.id as string, source };
     } catch {
       return null;
     }
@@ -212,7 +220,7 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
       const res = await fetch(`/api/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ ...patch, attribution: getPropertyAcquisitionAttribution(lang) }),
       });
       if (!res.ok) return null;
       return (await res.json()) as Record<string, unknown>;
@@ -259,10 +267,10 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
 
     // Step 1 complete → create lead record immediately
     if (step === 1) {
-      const id = await createLead(formData.address);
-      if (id) {
-        setLeadId(id);
-        trackLeadStarted("desktop", lang);
+      const lead = await createLead(formData.address);
+      if (lead) {
+        setLeadId(lead.id);
+        trackLeadStarted(lead.source, lang);
       }
     }
 
@@ -317,7 +325,10 @@ export default function LeadForm({ lang = "en" }: { lang?: Locale }) {
         typeof response?.metaEventId === "string"
           ? response.metaEventId
           : metaEventId,
-      source: "desktop",
+      source: getAttributedLeadSource(
+        "desktop",
+        getPropertyAcquisitionAttribution(lang),
+      ),
       lang,
       leadId,
     });

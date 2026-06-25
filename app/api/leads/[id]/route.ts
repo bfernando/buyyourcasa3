@@ -6,6 +6,13 @@ import {
   createServerMetaEventId,
   sendMetaLeadEvent,
 } from "@/lib/meta-capi";
+import { preflightResponse, withCors } from "@/lib/cors";
+import { notifyPropertyAcquisitionEngine } from "@/lib/property-acquisition";
+
+// CORS preflight for cross-origin PATCHes from micasainvestmentgroup.com
+export async function OPTIONS(req: NextRequest) {
+  return preflightResponse(req);
+}
 
 // PATCH /api/leads/:id — progressively update a lead as they complete each step
 export async function PATCH(
@@ -20,7 +27,7 @@ export async function PATCH(
     });
 
     if (!existingLead) {
-      return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+      return withCors(req, NextResponse.json({ error: "Lead not found" }, { status: 404 }));
     }
 
     // Strip undefined values so we don't overwrite existing data with nulls
@@ -51,6 +58,16 @@ export async function PATCH(
       data,
     });
 
+    await notifyPropertyAcquisitionEngine({
+      eventType: lead.completed ? "funnel_form_completed" : "funnel_form_updated",
+      lead,
+      attribution: body.attribution,
+      extra: {
+        userAgent: req.headers.get("user-agent"),
+        ip: req.headers.get("x-forwarded-for"),
+      },
+    });
+
     if (!existingLead.completed && lead.completed) {
       const results = await Promise.allSettled([
         sendLeadCompletionAlert(lead),
@@ -70,9 +87,9 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json({ ...lead, metaEventId });
+    return withCors(req, NextResponse.json({ ...lead, metaEventId }));
   } catch (err) {
     console.error("PATCH /api/leads/:id error:", err);
-    return NextResponse.json({ error: "Failed to update lead" }, { status: 500 });
+    return withCors(req, NextResponse.json({ error: "Failed to update lead" }, { status: 500 }));
   }
 }

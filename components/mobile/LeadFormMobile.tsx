@@ -10,6 +10,10 @@ import {
   trackLeadComplete,
   trackLeadStarted,
 } from "@/lib/meta-pixel";
+import {
+  getAttributedLeadSource,
+  getPropertyAcquisitionAttribution,
+} from "@/lib/property-acquisition-attribution-client";
 
 /**
  * LeadFormMobile
@@ -180,16 +184,20 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
   };
 
   // ─── Progressive capture helpers ─────────────────────────────────────────
-  const createLead = async (address: string): Promise<string | null> => {
+  const createLead = async (
+    address: string,
+  ): Promise<{ id: string; source: string } | null> => {
     try {
+      const attribution = getPropertyAcquisitionAttribution(lang);
+      const source = getAttributedLeadSource("mobile", attribution);
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, source: "mobile" }),
+        body: JSON.stringify({ address, source, attribution }),
       });
       if (!res.ok) return null;
       const data = await res.json();
-      return data.id as string;
+      return { id: data.id as string, source };
     } catch {
       return null;
     }
@@ -203,7 +211,7 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
       const res = await fetch(`/api/leads/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ ...patch, attribution: getPropertyAcquisitionAttribution(lang) }),
       });
       if (!res.ok) return null;
       return (await res.json()) as Record<string, unknown>;
@@ -238,10 +246,10 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
 
     // Step 1 complete → create lead record immediately (address captured)
     if (step === 1) {
-      const id = await createLead(form.address);
-      if (id) {
-        setLeadId(id);
-        trackLeadStarted("mobile", lang);
+      const lead = await createLead(form.address);
+      if (lead) {
+        setLeadId(lead.id);
+        trackLeadStarted(lead.source, lang);
       }
     }
 
@@ -297,7 +305,10 @@ export default function LeadFormMobile({ prefillAddress = "", lang = "en" }: Lea
         typeof response?.metaEventId === "string"
           ? response.metaEventId
           : metaEventId,
-      source: "mobile",
+      source: getAttributedLeadSource(
+        "mobile",
+        getPropertyAcquisitionAttribution(lang),
+      ),
       lang,
       leadId,
     });

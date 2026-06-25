@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
 import { sendLeadCompletionSmsAlert } from "@/lib/sms/lead-alert";
+import { notifyPropertyAcquisitionEngine } from "@/lib/property-acquisition";
 import {
   createServerMetaEventId,
   sendMetaLeadEvent,
@@ -244,6 +245,15 @@ async function handleCompleteLead(
     const results = await Promise.allSettled([
       sendLeadCompletionAlert(updatedLead),
       sendLeadCompletionSmsAlert(updatedLead),
+      notifyPropertyAcquisitionEngine({
+        eventType: "funnel_voice_completed",
+        lead: updatedLead,
+        attribution:
+          metadata?.propertyAcquisitionAttribution &&
+          typeof metadata.propertyAcquisitionAttribution === "object"
+            ? (metadata.propertyAcquisitionAttribution as Record<string, unknown>)
+            : undefined,
+      }),
       sendMetaLeadEvent({
         lead: updatedLead,
         eventId: metaEventId,

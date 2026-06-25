@@ -126,6 +126,19 @@ META_TEST_EVENT_CODE=<events-manager-test-code>
 
 When `META_ACCESS_TOKEN` is missing, the site still sends browser Pixel events, but server-side CAPI lead events are skipped.
 
+### Repeatable Facebook in-app browser funnel check
+
+Run this after funnel or ad-link changes:
+
+```bash
+npm run check:facebook-funnel
+```
+
+The check opens the live Spanish mobile funnel with a Facebook iPhone in-app
+browser user agent and `https://www.facebook.com/` referrer. It verifies the
+form-first funnel loads, the property address field is visible, and the old
+voice-first `Toca para Hablar` prompt is not present.
+
 ### Lead Email Notifications
 If you want an internal email alert whenever someone completes the funnel:
 
@@ -134,25 +147,20 @@ If you want an internal email alert whenever someone completes the funnel:
 
 ```bash
 LEAD_ALERT_TO=<your-inbox@example.com>
-LEAD_ALERT_FROM=BuyYourCasa Leads <onboarding@resend.dev>
+LEAD_ALERT_FROM=Mi Casa Investments <hello@buyyour.casa>
 ```
 
 The app sends one internal alert when a lead transitions to `completed=true`, across both the form and voice funnels.
 
-When you're ready to use a custom sender instead of `onboarding@resend.dev`, verify a Resend sending domain first. Use a subdomain like `send.buyyour.casa` so you do not disturb any existing root-domain mail setup.
+Current Resend setup for BuyYourCasa / Mi Casa Investments:
 
-If `buyyour.casa` DNS is managed in Bluehost, add the Resend records in Bluehost:
+- Outbound sending domain: `buyyour.casa`
+- Outbound sender: `Mi Casa Investments <hello@buyyour.casa>`
+- Resend domain ID: `e8a6655e-499b-48a3-bde3-8c38ef3f03f9`
+- Reply/receiving domain: `reply.buyyour.casa`
+- Reply domain ID: `7c30dd77-1550-457d-a344-1f6e92eae77d`
 
-1. Log in to Bluehost.
-2. Open `Domains`.
-3. Select `buyyour.casa`.
-4. Open the `DNS` tab.
-5. In `Manage Advanced DNS Records`, add the exact MX/TXT/CNAME records Resend gives you for the sending domain or subdomain.
-6. After the records propagate, switch `LEAD_ALERT_FROM` to your verified sender, for example:
-
-```bash
-LEAD_ALERT_FROM=BuyYourCasa Leads <alerts@send.buyyour.casa>
-```
+DNS is currently managed in GoDaddy. Do not add legacy Resend subdomain records from older setup notes; use the verified root sending domain and `reply.buyyour.casa` for inbound reply capture.
 
 ---
 

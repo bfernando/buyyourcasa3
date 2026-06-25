@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { preflightResponse, withCors } from "@/lib/cors";
+import { notifyPropertyAcquisitionEngine } from "@/lib/property-acquisition";
+
+// CORS preflight for cross-origin POSTs from micasainvestmentgroup.com
+export async function OPTIONS(req: NextRequest) {
+  return preflightResponse(req);
+}
 
 // POST /api/leads — create a new lead with just the address (Step 1 capture)
 export async function POST(req: NextRequest) {
@@ -7,7 +14,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (!body.address?.trim()) {
-      return NextResponse.json({ error: "Address is required" }, { status: 400 });
+      return withCors(req, NextResponse.json({ error: "Address is required" }, { status: 400 }));
     }
 
     const lead = await prisma.lead.create({
@@ -18,23 +25,33 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ id: lead.id }, { status: 201 });
+    await notifyPropertyAcquisitionEngine({
+      eventType: "funnel_form_started",
+      lead,
+      attribution: body.attribution,
+      extra: {
+        userAgent: req.headers.get("user-agent"),
+        ip: req.headers.get("x-forwarded-for"),
+      },
+    });
+
+    return withCors(req, NextResponse.json({ id: lead.id }, { status: 201 }));
   } catch (err) {
     console.error("POST /api/leads error:", err);
-    return NextResponse.json({ error: "Failed to create lead" }, { status: 500 });
+    return withCors(req, NextResponse.json({ error: "Failed to create lead" }, { status: 500 }));
   }
 }
 
 // GET /api/leads — list all leads (useful for a simple admin view later)
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const leads = await prisma.lead.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    return NextResponse.json(leads);
+    return withCors(req, NextResponse.json(leads));
   } catch (err) {
     console.error("GET /api/leads error:", err);
-    return NextResponse.json({ error: "Failed to fetch leads" }, { status: 500 });
+    return withCors(req, NextResponse.json({ error: "Failed to fetch leads" }, { status: 500 }));
   }
 }

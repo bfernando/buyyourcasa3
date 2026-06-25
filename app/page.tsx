@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Navigation from "@/components/Navigation";
-import Hero from "@/components/Hero";
 import TrustBar from "@/components/TrustBar";
 import HowItWorks from "@/components/HowItWorks";
 import PainToRelief from "@/components/PainToRelief";
@@ -13,19 +11,17 @@ import FAQ from "@/components/FAQ";
 import LeadForm from "@/components/LeadForm";
 import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
-import VoiceAgent from "@/components/VoiceAgent";
+import AcquisitionAttribution from "@/components/AcquisitionAttribution";
 
-// Desktop funnel — voice agent renders as a full-screen shell on top of
-// the SEO content. The content below is fully rendered (crawlable) but
-// hidden behind the overlay until the user dismisses it via "Prefer to type?".
+// English funnel — form-first for email and ad traffic. The address-first
+// wizard is the primary conversion path; no AI voice overlay on English routes.
 export default function Home() {
-  const [overlayDismissed, setOverlayDismissed] = useState(false);
-
   return (
     <>
+      <AcquisitionAttribution lang="en" />
       <main>
         <Navigation />
-        <Hero />
+        <LeadForm />
         <TrustBar />
         <HowItWorks />
         <PainToRelief />
@@ -33,19 +29,9 @@ export default function Home() {
         <Testimonials />
         <ServiceArea />
         <FAQ />
-        <LeadForm />
         <FinalCTA />
         <Footer />
       </main>
-
-      {!overlayDismissed && (
-        <VoiceAgent
-          lang="en"
-          shellMode
-          onDismiss={() => setOverlayDismissed(true)}
-          fallbackForm={<LeadForm />}
-        />
-      )}
     </>
   );
 }

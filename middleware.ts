@@ -4,8 +4,8 @@ import type { NextRequest } from "next/server";
 /**
  * Mobile Redirect Middleware
  * ───────────────────────────
- * Automatically routes mobile users to the purpose-built mobile funnel at /m.
- * Desktop users get the cinematic desktop funnel at /.
+ * Automatically routes mobile users to the purpose-built mobile funnel.
+ * Desktop users get the form-first desktop funnel.
  *
  * Detection: User-Agent string check (server-side, zero client JS cost).
  * This is the most reliable method for first-paint routing on Next.js.
@@ -27,22 +27,25 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
 
   // Keep the naked domain canonicalized to www once DNS is pointed to Vercel.
-  if (host === APEX_DOMAIN) {
+  // /u stays on the exact URL for one-click unsubscribe clients.
+  if (host === APEX_DOMAIN && pathname !== "/u") {
     const url = request.nextUrl.clone();
     url.host = CANONICAL_DOMAIN;
     url.protocol = "https";
     return NextResponse.redirect(url, 308);
   }
 
-  // Only apply to the root and /es paths
-  if (pathname !== "/" && pathname !== "/es") return NextResponse.next();
+  // Only apply to the root and language landing paths.
+  if (pathname !== "/" && pathname !== "/en" && pathname !== "/es") {
+    return NextResponse.next();
+  }
 
   // Allow ?preview=desktop to bypass redirect on mobile
   if (searchParams.get("preview") === "desktop") return NextResponse.next();
 
   // Allow ?preview=mobile to force mobile view on desktop
   if (searchParams.get("preview") === "mobile") {
-    const mobileTarget = pathname === "/es" ? "/es/m" : "/m";
+    const mobileTarget = pathname === "/es" ? "/es/m" : pathname === "/en" ? "/en/m" : "/m";
     return NextResponse.redirect(new URL(mobileTarget, request.url));
   }
 
@@ -50,7 +53,7 @@ export function middleware(request: NextRequest) {
   const isMobile = MOBILE_UA_REGEX.test(ua);
 
   if (isMobile) {
-    const mobileTarget = pathname === "/es" ? "/es/m" : "/m";
+    const mobileTarget = pathname === "/es" ? "/es/m" : pathname === "/en" ? "/en/m" : "/m";
     return NextResponse.redirect(new URL(mobileTarget, request.url));
   }
 

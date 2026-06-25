@@ -13,11 +13,11 @@ import LeadFormMobile from "@/components/mobile/LeadFormMobile";
 import FinalCTAMobile from "@/components/mobile/FinalCTAMobile";
 import StickyCTA from "@/components/mobile/StickyCTA";
 import Footer from "@/components/Footer";
-import VoiceAgent from "@/components/VoiceAgent";
+import AcquisitionAttribution from "@/components/AcquisitionAttribution";
 
+// Spanish mobile keeps the same address-first form flow as English mobile.
 export default function SpanishMobilePage() {
   const [heroAddress, setHeroAddress] = useState("");
-  const [overlayDismissed, setOverlayDismissed] = useState(false);
 
   const handleHeroAddress = (address: string) => {
     setHeroAddress(address);
@@ -25,6 +25,7 @@ export default function SpanishMobilePage() {
 
   return (
     <>
+      <AcquisitionAttribution lang="es" />
       <main className="bg-obsidian-900 min-h-screen">
         <NavMobile lang="es" />
         <HeroMobile onAddressSubmit={handleHeroAddress} lang="es" />
@@ -39,15 +40,6 @@ export default function SpanishMobilePage() {
         <Footer lang="es" />
         <StickyCTA lang="es" />
       </main>
-
-      {!overlayDismissed && (
-        <VoiceAgent
-          lang="es"
-          shellMode
-          onDismiss={() => setOverlayDismissed(true)}
-          fallbackForm={<LeadFormMobile prefillAddress={heroAddress} lang="es" />}
-        />
-      )}
     </>
   );
 }

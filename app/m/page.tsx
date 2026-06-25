@@ -13,18 +13,17 @@ import LeadFormMobile from "@/components/mobile/LeadFormMobile";
 import FinalCTAMobile from "@/components/mobile/FinalCTAMobile";
 import StickyCTA from "@/components/mobile/StickyCTA";
 import Footer from "@/components/Footer";
-import VoiceAgent from "@/components/VoiceAgent";
+import AcquisitionAttribution from "@/components/AcquisitionAttribution";
 
 /**
  * Mobile Funnel Page — /m
- * Voice agent renders as a full-screen shell on top of the SEO content.
- * Address entered in hero is passed as prop to LeadFormMobile (fallback),
- * which prefills Step 1 and advances to Step 2 immediately.
+ * Address-first mobile wizard for English traffic. Address entered in hero is
+ * passed into LeadFormMobile, which keeps the rest of the flow focused on the
+ * form instead of an AI voice overlay.
  */
 
 export default function MobilePage() {
   const [heroAddress, setHeroAddress] = useState("");
-  const [overlayDismissed, setOverlayDismissed] = useState(false);
 
   const handleHeroAddress = (address: string) => {
     setHeroAddress(address);
@@ -33,6 +32,7 @@ export default function MobilePage() {
 
   return (
     <>
+      <AcquisitionAttribution lang="en" />
       <main className="bg-obsidian-900 min-h-screen">
         {/* Sticky top nav */}
         <NavMobile />
@@ -70,16 +70,6 @@ export default function MobilePage() {
         {/* Sticky bottom CTA — always accessible */}
         <StickyCTA />
       </main>
-
-      {/* Voice agent overlay — full-screen, voice-first primary conversion path */}
-      {!overlayDismissed && (
-        <VoiceAgent
-          lang="en"
-          shellMode
-          onDismiss={() => setOverlayDismissed(true)}
-          fallbackForm={<LeadFormMobile prefillAddress={heroAddress} />}
-        />
-      )}
     </>
   );
 }

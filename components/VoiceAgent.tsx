@@ -36,6 +36,10 @@ import {
   trackLeadStarted,
 } from "@/lib/meta-pixel";
 import { assistantFor } from "@/lib/vapi/assistants";
+import {
+  getAttributedLeadSource,
+  getPropertyAcquisitionAttribution,
+} from "@/lib/property-acquisition-attribution-client";
 
 type Phase =
   | "idle"
@@ -92,6 +96,14 @@ type Props = {
    *  hard-couple VoiceAgent to LeadForm/LeadFormMobile. */
   fallbackForm?: React.ReactNode;
 };
+
+type BrowserAudioUnlockResult = {
+  audioContext: string;
+  audioElement: string;
+};
+
+const SILENT_WAV_DATA_URI =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQQAAAAAAA==";
 
 function normalizeMessageText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -180,6 +192,22 @@ function isNoMicrophoneError(value: string) {
   );
 }
 
+function inAppBrowserName(userAgent: string) {
+  if (/FBAN|FBAV|FBIOS|FB_IAB|FB4A|FBDV/i.test(userAgent)) {
+    return "Facebook";
+  }
+  if (/Instagram/i.test(userAgent)) {
+    return "Instagram";
+  }
+  if (/Messenger/i.test(userAgent)) {
+    return "Messenger";
+  }
+  if (/TikTok/i.test(userAgent)) {
+    return "TikTok";
+  }
+  return null;
+}
+
 async function hasAvailableMicrophone() {
   if (typeof navigator === "undefined" || !navigator.mediaDevices) {
     return true;
@@ -193,6 +221,94 @@ async function hasAvailableMicrophone() {
     // Let Vapi/getUserMedia surface the real browser permission or device error.
     return true;
   }
+}
+
+function unlockBrowserAudio(): Promise<BrowserAudioUnlockResult> {
+  const result: BrowserAudioUnlockResult = {
+    audioContext: "unavailable",
+    audioElement: "unavailable",
+  };
+
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return Promise.resolve(result);
+  }
+
+  const pending: Array<Promise<void>> = [];
+
+  try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+
+    if (AudioContextCtor) {
+      const audioContext = new AudioContextCtor();
+      const resumePromise =
+        audioContext.state === "suspended"
+          ? audioContext.resume()
+          : Promise.resolve();
+
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        gain.gain.value = 0;
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.01);
+      } catch {
+        // The resume call above is the important unlock attempt.
+      }
+
+      pending.push(
+        resumePromise
+          .then(() => {
+            result.audioContext = audioContext.state;
+          })
+          .catch((error) => {
+            result.audioContext =
+              error instanceof Error ? error.name : "failed";
+          })
+          .finally(() => {
+            window.setTimeout(() => {
+              void audioContext.close().catch(() => undefined);
+            }, 250);
+          }),
+      );
+    } else {
+      result.audioContext = "unsupported";
+    }
+  } catch (error) {
+    result.audioContext = error instanceof Error ? error.name : "failed";
+  }
+
+  try {
+    const audio = document.createElement("audio");
+    audio.src = SILENT_WAV_DATA_URI;
+    audio.preload = "auto";
+    audio.muted = false;
+    audio.volume = 0.01;
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+
+    const playPromise = audio.play();
+    pending.push(
+      playPromise
+        .then(() => {
+          result.audioElement = "played";
+        })
+        .catch((error) => {
+          result.audioElement = error instanceof Error ? error.name : "failed";
+        })
+        .finally(() => {
+          audio.pause();
+          audio.remove();
+        }),
+    );
+  } catch (error) {
+    result.audioElement = error instanceof Error ? error.name : "failed";
+  }
+
+  return Promise.allSettled(pending).then(() => result);
 }
 
 function sanitizeError(error: unknown) {
@@ -228,6 +344,62 @@ function sanitizeError(error: unknown) {
   }
 
   return { message: String(error).slice(0, 500) };
+}
+
+function sanitizeCallStartEvent(event: unknown) {
+  if (!event || typeof event !== "object") {
+    return { message: String(event).slice(0, 500) };
+  }
+
+  const record = event as Record<string, unknown>;
+  const metadata =
+    record.metadata && typeof record.metadata === "object"
+      ? Object.fromEntries(
+          Object.entries(record.metadata as Record<string, unknown>)
+            .slice(0, 12)
+            .map(([key, value]) => [
+              key,
+              typeof value === "string" ||
+              typeof value === "number" ||
+              typeof value === "boolean"
+                ? value
+                : String(value).slice(0, 200),
+            ]),
+        )
+      : undefined;
+  const context =
+    record.context && typeof record.context === "object"
+      ? Object.fromEntries(
+          Object.entries(record.context as Record<string, unknown>)
+            .slice(0, 12)
+            .map(([key, value]) => [
+              key,
+              typeof value === "string" ||
+              typeof value === "number" ||
+              typeof value === "boolean"
+                ? value
+                : String(value).slice(0, 200),
+            ]),
+        )
+      : undefined;
+
+  return {
+    stage: typeof record.stage === "string" ? record.stage : undefined,
+    status: typeof record.status === "string" ? record.status : undefined,
+    duration:
+      typeof record.duration === "number" ? record.duration : undefined,
+    totalDuration:
+      typeof record.totalDuration === "number"
+        ? record.totalDuration
+        : undefined,
+    timestamp:
+      typeof record.timestamp === "string" ? record.timestamp : undefined,
+    callId: typeof record.callId === "string" ? record.callId : undefined,
+    error:
+      typeof record.error === "string" ? record.error.slice(0, 500) : undefined,
+    metadata,
+    context,
+  };
 }
 
 function voiceErrorMessage(code: VoiceErrorCode | null, lang: Locale) {
@@ -300,6 +472,10 @@ export default function VoiceAgent({
   const [typedInput, setTypedInput] = useState("");
   const [leadSummary, setLeadSummary] = useState<LeadSummary>({});
   const [errorCode, setErrorCode] = useState<VoiceErrorCode | null>(null);
+  const [browserWarningName, setBrowserWarningName] = useState<string | null>(
+    null,
+  );
+  const [showAudioInputNotice, setShowAudioInputNotice] = useState(false);
 
   const vapiRef = useRef<Vapi | null>(null);
   const phaseRef = useRef<Phase>("idle");
@@ -318,16 +494,29 @@ export default function VoiceAgent({
   const assistantOfferedClosingRef = useRef(false);
   const assistantFinalFarewellRef = useRef(false);
   const assistantCompletedFarewellRef = useRef(false);
+  const lastUserHeardAtRef = useRef<number | null>(null);
+  const userAudioDetectedReportedRef = useRef(false);
+  const noUserAudioNoticeReportedRef = useRef(false);
+  const assistantAudioDetectedReportedRef = useRef(false);
+  const lastAudioUnlockResultRef = useRef<BrowserAudioUnlockResult | null>(null);
   const successDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
   const callEndFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const audioInputNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    setBrowserWarningName(inAppBrowserName(navigator.userAgent));
+  }, []);
 
   const reportClientEvent = useCallback(
     (event: string, details?: Record<string, unknown>) => {
@@ -359,9 +548,70 @@ export default function VoiceAgent({
     [lang],
   );
 
+  const markUserAudioHeard = useCallback(
+    (source: string) => {
+      lastUserHeardAtRef.current = Date.now();
+      setShowAudioInputNotice(false);
+      if (audioInputNoticeTimeoutRef.current) {
+        clearTimeout(audioInputNoticeTimeoutRef.current);
+        audioInputNoticeTimeoutRef.current = null;
+      }
+
+      if (userAudioDetectedReportedRef.current) return;
+      userAudioDetectedReportedRef.current = true;
+      reportClientEvent("voice_user_audio_detected", {
+        source,
+        connected: callConnectedRef.current,
+        inAppBrowser: browserWarningName,
+        elapsedMs: callStartedAtRef.current
+          ? Date.now() - callStartedAtRef.current
+          : undefined,
+      });
+    },
+    [browserWarningName, reportClientEvent],
+  );
+
+  const scheduleAudioInputNotice = useCallback(
+    (reason: string) => {
+      if (audioInputNoticeTimeoutRef.current) {
+        clearTimeout(audioInputNoticeTimeoutRef.current);
+      }
+
+      audioInputNoticeTimeoutRef.current = setTimeout(() => {
+        const currentPhase = phaseRef.current;
+        const canShowNotice =
+          currentPhase === "listening" ||
+          currentPhase === "speaking" ||
+          currentPhase === "thinking";
+
+        if (!canShowNotice) return;
+
+        const lastUserHeardAt = lastUserHeardAtRef.current;
+        if (lastUserHeardAt && Date.now() - lastUserHeardAt < 12_000) {
+          return;
+        }
+
+        setShowAudioInputNotice(true);
+
+        if (noUserAudioNoticeReportedRef.current) return;
+        noUserAudioNoticeReportedRef.current = true;
+        reportClientEvent("voice_no_user_audio_detected", {
+          reason,
+          connected: callConnectedRef.current,
+          inAppBrowser: browserWarningName,
+          elapsedMs: callStartedAtRef.current
+            ? Date.now() - callStartedAtRef.current
+            : undefined,
+        });
+      }, 14_000);
+    },
+    [browserWarningName, reportClientEvent],
+  );
+
   const enterErrorState = useCallback(
     (code: VoiceErrorCode, details?: Record<string, unknown>) => {
       setErrorCode(code);
+      setShowAudioInputNotice(false);
       setPhase(code === "microphone_blocked" ? "mic-blocked" : "error");
       reportClientEvent(`voice_error_${code}`, details);
     },
@@ -418,6 +668,11 @@ export default function VoiceAgent({
     if (callEndFallbackTimeoutRef.current) {
       clearTimeout(callEndFallbackTimeoutRef.current);
       callEndFallbackTimeoutRef.current = null;
+    }
+
+    if (audioInputNoticeTimeoutRef.current) {
+      clearTimeout(audioInputNoticeTimeoutRef.current);
+      audioInputNoticeTimeoutRef.current = null;
     }
   }, []);
 
@@ -577,20 +832,48 @@ export default function VoiceAgent({
     const vapi = new Vapi(publicKey);
     vapiRef.current = vapi;
 
+    vapi.on("call-start-progress", (event) => {
+      reportClientEvent("voice_call_start_progress", {
+        ...sanitizeCallStartEvent(event),
+        inAppBrowser: browserWarningName,
+        audioUnlock: lastAudioUnlockResultRef.current,
+      });
+    });
+
+    vapi.on("call-start-success", (event) => {
+      reportClientEvent("voice_call_start_success", {
+        ...sanitizeCallStartEvent(event),
+        inAppBrowser: browserWarningName,
+        audioUnlock: lastAudioUnlockResultRef.current,
+      });
+    });
+
+    vapi.on("call-start-failed", (event) => {
+      reportClientEvent("voice_call_start_failed", {
+        ...sanitizeCallStartEvent(event),
+        inAppBrowser: browserWarningName,
+        audioUnlock: lastAudioUnlockResultRef.current,
+      });
+    });
+
     vapi.on("call-start", () => {
       callConnectedRef.current = true;
       reportClientEvent("voice_call_started", {
         elapsedMs: callStartedAtRef.current
           ? Date.now() - callStartedAtRef.current
           : undefined,
+        inAppBrowser: browserWarningName,
+        audioUnlock: lastAudioUnlockResultRef.current,
       });
       setPhase("listening");
+      scheduleAudioInputNotice("call_started");
     });
 
     vapi.on("call-end", () => {
       reportClientEvent("voice_call_end_event", {
         endedReason: callEndedReasonRef.current,
         connected: callConnectedRef.current,
+        inAppBrowser: browserWarningName,
         elapsedMs: callStartedAtRef.current
           ? Date.now() - callStartedAtRef.current
           : undefined,
@@ -603,10 +886,26 @@ export default function VoiceAgent({
       }, 250);
     });
 
-    vapi.on("speech-start", () => setPhase("speaking"));
+    vapi.on("speech-start", () => {
+      reportClientEvent("voice_assistant_speech_started", {
+        elapsedMs: callStartedAtRef.current
+          ? Date.now() - callStartedAtRef.current
+          : undefined,
+        inAppBrowser: browserWarningName,
+        audioUnlock: lastAudioUnlockResultRef.current,
+      });
+      setPhase("speaking");
+    });
     vapi.on("speech-end", () => {
+      reportClientEvent("voice_assistant_speech_ended", {
+        elapsedMs: callStartedAtRef.current
+          ? Date.now() - callStartedAtRef.current
+          : undefined,
+        inAppBrowser: browserWarningName,
+      });
       setPhase("listening");
       flushPendingTypedMessages();
+      scheduleAudioInputNotice("assistant_speech_ended");
 
       if (assistantFinalFarewellRef.current) {
         gracefulStopRef.current = true;
@@ -614,7 +913,21 @@ export default function VoiceAgent({
       }
     });
 
-    vapi.on("volume-level", (v: number) => setVolume(v));
+    vapi.on("volume-level", (v: number) => {
+      setVolume(v);
+
+      if (v > 0.01 && !assistantAudioDetectedReportedRef.current) {
+        assistantAudioDetectedReportedRef.current = true;
+        reportClientEvent("voice_assistant_audio_detected", {
+          level: Number(v.toFixed(3)),
+          elapsedMs: callStartedAtRef.current
+            ? Date.now() - callStartedAtRef.current
+            : undefined,
+          inAppBrowser: browserWarningName,
+          audioUnlock: lastAudioUnlockResultRef.current,
+        });
+      }
+    });
 
     vapi.on("error", (err: unknown) => {
       console.error("[VoiceAgent] vapi error", err);
@@ -654,6 +967,10 @@ export default function VoiceAgent({
           connected: callConnectedRef.current,
         });
 
+        if (status === "in-progress") {
+          scheduleAudioInputNotice("status_in_progress");
+        }
+
         if (status === "ended") {
           finishCall(endedReason);
         }
@@ -670,6 +987,10 @@ export default function VoiceAgent({
           | undefined;
         if (!text) return;
         const normalizedText = normalizeMessageText(text);
+
+        if (role === "user") {
+          markUserAudioHeard(transcriptType ?? "unknown");
+        }
 
         if (transcriptType === "final") {
           if (role === "assistant") {
@@ -753,7 +1074,10 @@ export default function VoiceAgent({
                 eventId:
                   voiceLeadEventIdRef.current ??
                   createMetaEventId(`lead_voice_${lang}`),
-                source: lang === "es" ? "voice-es" : "voice-en",
+                source: getAttributedLeadSource(
+                  lang === "es" ? "voice-es" : "voice-en",
+                  getPropertyAcquisitionAttribution(lang),
+                ),
                 lang,
               });
             }
@@ -783,19 +1107,24 @@ export default function VoiceAgent({
     enterErrorState,
     finishCall,
     flushPendingTypedMessages,
+    markUserAudioHeard,
     reportClientEvent,
+    scheduleAudioInputNotice,
     syncLeadSummary,
+    browserWarningName,
   ]);
 
   // ─── Start the call (one-tap) ────────────────────────────────────────────
   const startCall = useCallback(async (initialTypedMessage?: string) => {
     const initialMessage = normalizeMessageText(initialTypedMessage ?? "");
+    const audioUnlockResultPromise = unlockBrowserAudio();
 
     clearCallTimers();
     callEndedReasonRef.current = null;
     callStartedAtRef.current = Date.now();
     callConnectedRef.current = false;
     setErrorCode(null);
+    setShowAudioInputNotice(false);
     leadCompletedRef.current = false;
     leadPixelTrackedRef.current = false;
     manualStopRef.current = false;
@@ -804,6 +1133,11 @@ export default function VoiceAgent({
     assistantOfferedClosingRef.current = false;
     assistantFinalFarewellRef.current = false;
     assistantCompletedFarewellRef.current = false;
+    lastUserHeardAtRef.current = initialMessage ? Date.now() : null;
+    userAudioDetectedReportedRef.current = false;
+    noUserAudioNoticeReportedRef.current = false;
+    assistantAudioDetectedReportedRef.current = false;
+    lastAudioUnlockResultRef.current = null;
     voiceLeadEventIdRef.current = createMetaEventId(`lead_voice_${lang}`);
     setHasStartedConversation(true);
     setPhase("connecting");
@@ -812,10 +1146,36 @@ export default function VoiceAgent({
     setLeadSummary({});
     pendingTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
     optimisticTypedMessagesRef.current = initialMessage ? [initialMessage] : [];
-    trackLeadStarted(lang === "es" ? "voice-es" : "voice-en", lang);
+    const attribution = getPropertyAcquisitionAttribution(lang);
+    const voiceSource = getAttributedLeadSource(
+      lang === "es" ? "voice-es" : "voice-en",
+      attribution,
+    );
+    trackLeadStarted(voiceSource, lang);
     reportClientEvent("voice_start_attempt", {
       hasInitialTypedMessage: Boolean(initialMessage),
+      inAppBrowser: browserWarningName,
     });
+
+    void audioUnlockResultPromise
+      .then((result) => {
+        lastAudioUnlockResultRef.current = result;
+        reportClientEvent("voice_audio_unlock_result", {
+          ...result,
+          inAppBrowser: browserWarningName,
+        });
+      })
+      .catch((error) => {
+        const result: BrowserAudioUnlockResult = {
+          audioContext: "failed",
+          audioElement: error instanceof Error ? error.name : "failed",
+        };
+        lastAudioUnlockResultRef.current = result;
+        reportClientEvent("voice_audio_unlock_result", {
+          ...result,
+          inAppBrowser: browserWarningName,
+        });
+      });
 
     const microphoneAvailable = await hasAvailableMicrophone();
     if (!microphoneAvailable) {
@@ -839,8 +1199,10 @@ export default function VoiceAgent({
         ...baseAssistant,
         metadata: {
           ...(baseAssistant.metadata ?? {}),
+          source: voiceSource,
           ...(getMetaBrowserContext() ?? {}),
           metaEventId: voiceLeadEventIdRef.current,
+          propertyAcquisitionAttribution: attribution,
         },
       };
 
@@ -859,7 +1221,14 @@ export default function VoiceAgent({
         { error: sanitizeError(err) },
       );
     }
-  }, [clearCallTimers, enterErrorState, reportClientEvent, setupVapi, lang]);
+  }, [
+    clearCallTimers,
+    enterErrorState,
+    reportClientEvent,
+    setupVapi,
+    lang,
+    browserWarningName,
+  ]);
 
   // ─── Stop the call manually ──────────────────────────────────────────────
   const endCall = useCallback(() => {
@@ -972,6 +1341,12 @@ export default function VoiceAgent({
       setTypedInput("");
 
       if (phase === "listening" && vapiRef.current) {
+        lastUserHeardAtRef.current = Date.now();
+        setShowAudioInputNotice(false);
+        if (audioInputNoticeTimeoutRef.current) {
+          clearTimeout(audioInputNoticeTimeoutRef.current);
+          audioInputNoticeTimeoutRef.current = null;
+        }
         optimisticTypedMessagesRef.current.push(nextMessage);
         setTurns((prev) => [...prev, { role: "user", text: nextMessage }]);
 
@@ -997,6 +1372,12 @@ export default function VoiceAgent({
         phase === "speaking" ||
         phase === "thinking"
       ) {
+        lastUserHeardAtRef.current = Date.now();
+        setShowAudioInputNotice(false);
+        if (audioInputNoticeTimeoutRef.current) {
+          clearTimeout(audioInputNoticeTimeoutRef.current);
+          audioInputNoticeTimeoutRef.current = null;
+        }
         optimisticTypedMessagesRef.current.push(nextMessage);
         pendingTypedMessagesRef.current.push(nextMessage);
         setTurns((prev) => [...prev, { role: "user", text: nextMessage }]);
@@ -1074,9 +1455,30 @@ export default function VoiceAgent({
               >
                 {c.idleTitle}
               </h1>
-              <p className="text-cream/55 font-body font-light text-base lg:text-lg leading-relaxed mb-12 max-w-lg">
+              <p className="text-cream/55 font-body font-light text-base lg:text-lg leading-relaxed mb-8 max-w-lg">
                 {c.idleSub}
               </p>
+
+              {browserWarningName && (
+                <div className="mb-8 w-full rounded-2xl border border-gold/25 bg-gold/[0.06] px-5 py-4 text-left">
+                  <p className="text-sm font-body font-medium text-cream">
+                    {c.inAppBrowserTitle}
+                  </p>
+                  <p className="mt-2 text-xs font-body leading-relaxed text-cream/55">
+                    {c.inAppBrowserSub}
+                  </p>
+                  {fallbackForm && (
+                    <button
+                      onClick={() =>
+                        showFallbackForm(`in_app_browser_${browserWarningName}`)
+                      }
+                      className="mt-4 w-full rounded-sm border border-gold/35 px-4 py-3 text-xs font-body uppercase tracking-[0.18em] text-gold transition-colors hover:border-gold/60 hover:text-gold-300"
+                    >
+                      {c.audioInputNoticeFallback}
+                    </button>
+                  )}
+                </div>
+              )}
 
               <TapToTalkButton onClick={handleStartCall} label={c.startButton} />
 
@@ -1138,6 +1540,27 @@ export default function VoiceAgent({
                   </span>
                 </div>
               </div>
+
+              {showAudioInputNotice && (
+                <div className="w-full rounded-2xl border border-gold/25 bg-gold/[0.06] px-5 py-4 text-left">
+                  <p className="text-sm font-body font-medium text-cream">
+                    {c.audioInputNoticeTitle}
+                  </p>
+                  <p className="mt-2 text-xs font-body leading-relaxed text-cream/55">
+                    {c.audioInputNoticeSub}
+                  </p>
+                  {fallbackForm && (
+                    <button
+                      onClick={() =>
+                        showFallbackForm("no_user_audio_detected")
+                      }
+                      className="mt-4 rounded-sm border border-gold/35 px-4 py-2.5 text-xs font-body uppercase tracking-[0.18em] text-gold transition-colors hover:border-gold/60 hover:text-gold-300"
+                    >
+                      {c.audioInputNoticeFallback}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Live transcript */}
               <div className="w-full max-h-[40vh] overflow-y-auto px-1 space-y-3 pr-2">
