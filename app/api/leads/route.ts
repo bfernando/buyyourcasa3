@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { preflightResponse, withCors } from "@/lib/cors";
 import { notifyPropertyAcquisitionEngine } from "@/lib/property-acquisition";
@@ -42,8 +43,36 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/leads — list all leads (useful for a simple admin view later)
+function isAuthorizedLeadRead(req: NextRequest) {
+  const expectedValues = [
+    process.env.LEADS_ADMIN_TOKEN,
+    process.env.ADMIN_API_TOKEN,
+    process.env.PROPERTY_ACQUISITION_ENGINE_WEBHOOK_SECRET,
+  ]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  if (expectedValues.length === 0) return false;
+
+  const supplied = (
+    req.headers.get("x-admin-api-token") ||
+    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+    ""
+  ).trim();
+  if (!supplied) return false;
+
+  const suppliedBuffer = Buffer.from(supplied);
+  return expectedValues.some((expected) => {
+    const expectedBuffer = Buffer.from(expected);
+    return suppliedBuffer.length === expectedBuffer.length && timingSafeEqual(suppliedBuffer, expectedBuffer);
+  });
+}
+
+// GET /api/leads — private admin-only lead review endpoint.
 export async function GET(req: NextRequest) {
+  if (!isAuthorizedLeadRead(req)) {
+    return withCors(req, NextResponse.json({ error: "Not found" }, { status: 404 }));
+  }
+
   try {
     const leads = await prisma.lead.findMany({
       orderBy: { createdAt: "desc" },

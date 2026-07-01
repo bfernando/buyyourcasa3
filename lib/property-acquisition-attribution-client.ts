@@ -38,6 +38,34 @@ function expandTemplateCode(value?: string) {
   return TEMPLATE_CODE_TO_NAME[value] ?? value;
 }
 
+function slugPart(value?: string, maxLength = 32) {
+  if (!value) return undefined;
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, maxLength)
+    .replace(/-+$/g, "");
+
+  return slug || undefined;
+}
+
+function isMetaTraffic(...values: Array<string | undefined>) {
+  return values.some((value) => {
+    const slug = slugPart(value, 64);
+    return Boolean(
+      slug &&
+        (slug.includes("facebook") ||
+          slug.includes("meta") ||
+          slug.includes("instagram") ||
+          slug === "fb" ||
+          slug === "ig" ||
+          slug.includes("paid-social")),
+    );
+  });
+}
+
 export function getPropertyAcquisitionAttribution(lang?: string): PropertyAcquisitionAttribution {
   if (typeof window === "undefined") return {};
 
@@ -91,6 +119,20 @@ export function getAttributedLeadSource(
 ) {
   if (isPostcardAttribution(attribution)) {
     return `${baseSource}-postcard`;
+  }
+
+  const source = slugPart(attribution.utm_source);
+  const medium = slugPart(attribution.utm_medium);
+  const campaign = slugPart(attribution.utm_campaign);
+  const content = slugPart(attribution.utm_content);
+
+  if (source || medium || campaign || content) {
+    const channel = isMetaTraffic(source, medium, campaign, content)
+      ? "facebook"
+      : source ?? medium ?? "utm";
+    const creative = content ?? campaign;
+
+    return [baseSource, channel, creative].filter(Boolean).join("-");
   }
 
   return baseSource;

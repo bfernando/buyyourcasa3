@@ -152,6 +152,18 @@ LEAD_ALERT_FROM=Mi Casa Investments <hello@buyyour.casa>
 
 The app sends one internal alert when a lead transitions to `completed=true`, across both the form and voice funnels.
 
+### Private Lead Review Endpoint
+
+`GET /api/leads` is private. Public requests return `404` so seller contact data is not exposed.
+
+Authorized operator reads must include one of these secrets as `x-admin-api-token` or `Authorization: Bearer ...`:
+
+- `LEADS_ADMIN_TOKEN`, preferred if a dedicated review token is added later.
+- `ADMIN_API_TOKEN`, if the project gets a general admin token.
+- `PROPERTY_ACQUISITION_ENGINE_WEBHOOK_SECRET`, currently configured and used as the fallback shared integration secret.
+
+Do not put these values in browser code, public docs, screenshots, or chat logs.
+
 Current Resend setup for BuyYourCasa / Mi Casa Investments:
 
 - Outbound sending domain: `buyyour.casa`
