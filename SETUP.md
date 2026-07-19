@@ -101,6 +101,30 @@ NEXT_PUBLIC_VAPI_VOICE_ES_MODEL=eleven_turbo_v2_5
 
 If those env vars are omitted, the app falls back to the current built-in ElevenLabs voice IDs.
 
+### Vapi Inbound SMS Lead Capture
+
+The Mi Casa Twilio number can use Vapi SMS Chat for customer-initiated text
+conversations. The number must be SMS-capable, 10DLC approved, imported into
+Vapi with SMS enabled, and attached to the Mi Casa assistant.
+
+The assistant uses the `save_mi_casa_sms_lead` function tool after a seller
+provides a property address. The tool posts to `/api/vapi/webhook`, stores the
+sender as an `sms-vapi` lead, and triggers the normal email, internal SMS, Meta
+CAPI, and acquisition-engine completion notifications. Automated QA calls must
+set `isTest=true`; those rows use `test-sms-vapi` and do not send notifications.
+
+Required production variables:
+
+```bash
+VAPI_PRIVATE_KEY=<private Vapi API key>
+VAPI_WEBHOOK_SECRET=<token stored in the Vapi webhook credential>
+NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID=<Vapi webhook credential ID>
+```
+
+Keep SMS responses concise and modality-aware. The shared assistant should say
+"Thanks for reaching out" rather than phone-only wording such as "Thanks for
+calling," because the same assistant serves voice and text conversations.
+
 ### Meta Pixel and Conversions API
 Add the Pixel ID in Vercel so Meta receives browser events from the funnel:
 

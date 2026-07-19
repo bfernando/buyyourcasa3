@@ -32,8 +32,11 @@ import {
 // Loosely typed — Vapi's payload shape is large and we only read a few fields.
 type ToolCall = {
   id: string;
-  type: "function";
-  function: {
+  type?: "function";
+  name?: string;
+  arguments?: string | Record<string, unknown>;
+  parameters?: string | Record<string, unknown>;
+  function?: {
     name: string;
     arguments: string | Record<string, unknown>;
   };
@@ -41,7 +44,19 @@ type ToolCall = {
 
 type ToolCallsMessage = {
   type: "tool-calls";
-  call?: { id?: string; metadata?: Record<string, unknown> };
+  call?: {
+    id?: string;
+    type?: string;
+    metadata?: Record<string, unknown>;
+    customer?: { number?: string };
+  };
+  chat?: { id?: string; customer?: { number?: string } };
+  session?: {
+    id?: string;
+    metadata?: Record<string, unknown>;
+    customer?: { number?: string };
+  };
+  customer?: { number?: string };
   toolCallList?: ToolCall[];
   toolCalls?: ToolCall[];
 };
@@ -126,6 +141,49 @@ function str(v: unknown): string | undefined {
   if (typeof v !== "string") return undefined;
   const trimmed = v.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function bool(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v !== "string") return false;
+  return ["true", "yes", "1"].includes(v.trim().toLowerCase());
+}
+
+function toolName(call: ToolCall): string | undefined {
+  return call.function?.name ?? call.name;
+}
+
+function toolArguments(call: ToolCall): Record<string, unknown> {
+  return parseArgs(
+    call.function?.arguments ?? call.arguments ?? call.parameters,
+  );
+}
+
+function interactionId(message: ToolCallsMessage): string | undefined {
+  const directId = message.call?.id ?? message.chat?.id ?? message.session?.id;
+  if (directId) return directId;
+
+  const phone = customerPhone(message);
+  return phone ? `sms:${phone}` : undefined;
+}
+
+function customerPhone(message: ToolCallsMessage): string | undefined {
+  return (
+    str(message.customer?.number) ??
+    str(message.session?.customer?.number) ??
+    str(message.chat?.customer?.number) ??
+    str(message.call?.customer?.number)
+  );
+}
+
+function interactionSource(message: ToolCallsMessage): string {
+  const metadata = message.call?.metadata ?? message.session?.metadata;
+  const configuredSource = str(metadata?.source);
+  if (configuredSource) return configuredSource;
+
+  return message.chat || message.session || message.call?.type === "chat"
+    ? "sms-vapi"
+    : "voice-en";
 }
 
 // ─── Tool-call handlers ───────────────────────────────────────────────────
@@ -276,6 +334,84 @@ async function handleCompleteLead(
   return { ok: true, leadId: lead.id };
 }
 
+async function handleSaveSmsLead(
+  conversationId: string,
+  args: Record<string, unknown>,
+  fallbackPhone?: string,
+) {
+  const isTest = bool(args.isTest);
+  const source = isTest ? "test-sms-vapi" : "sms-vapi";
+  const address = str(args.address);
+  const phone = str(args.phone) ?? fallbackPhone;
+  const firstName = str(args.firstName);
+  const lastName = str(args.lastName);
+  const email = str(args.email);
+  const condition = str(args.condition);
+  const timeline = str(args.timeline);
+  const reason = str(args.reason);
+
+  if (!address) {
+    return { ok: false, error: "address missing" };
+  }
+
+  const existing = await findOrCreateByCallId(conversationId, {
+    address,
+    source,
+  });
+  const hasDetails = Boolean(condition || timeline || reason);
+  const shouldComplete = !isTest && Boolean(phone);
+
+  const updatedLead = await prisma.lead.update({
+    where: { id: existing.id },
+    data: {
+      address,
+      source,
+      ...(phone && { phone }),
+      ...(firstName && { firstName }),
+      ...(lastName && { lastName }),
+      ...(email && { email }),
+      ...(condition && { condition }),
+      ...(timeline && { timeline }),
+      ...(reason && { reason }),
+      step: hasDetails ? 3 : phone ? 2 : 1,
+      ...(shouldComplete && { completed: true }),
+    },
+  });
+
+  if (!existing.completed && updatedLead.completed) {
+    const metaEventId = createServerMetaEventId("lead_sms", updatedLead.id);
+    const results = await Promise.allSettled([
+      sendLeadCompletionAlert(updatedLead),
+      sendLeadCompletionSmsAlert(updatedLead),
+      notifyPropertyAcquisitionEngine({
+        eventType: "funnel_sms_completed",
+        lead: updatedLead,
+      }),
+      sendMetaLeadEvent({
+        lead: updatedLead,
+        eventId: metaEventId,
+        browser: {},
+      }),
+    ]);
+
+    for (const result of results) {
+      if (result.status === "rejected") {
+        console.error(
+          "[vapi webhook] SMS lead completion side effect failed",
+          result.reason,
+        );
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    leadId: updatedLead.id,
+    completed: updatedLead.completed,
+    test: isTest,
+  };
+}
+
 // ─── End-of-call-report handler ───────────────────────────────────────────
 async function handleEndOfCall(msg: EndOfCallMessage) {
   const callId = msg.call?.id;
@@ -330,19 +466,26 @@ export async function POST(req: NextRequest) {
   try {
     if (type === "tool-calls") {
       const m = msg as unknown as ToolCallsMessage;
-      const callId = m.call?.id ?? "";
+      const callId = interactionId(m);
+      if (!callId) {
+        return NextResponse.json(
+          { error: "missing interaction id" },
+          { status: 400 },
+        );
+      }
       const metadata = m.call?.metadata;
-      const source = (metadata?.source as string | undefined) ?? "voice-en";
+      const source = interactionSource(m);
       const calls = m.toolCallList ?? m.toolCalls ?? [];
 
       // Vapi expects a `results` array keyed by the tool-call id.
       const results: Array<{ toolCallId: string; result: string }> = [];
 
       for (const call of calls) {
-        const args = parseArgs(call.function.arguments);
+        const name = toolName(call);
+        const args = toolArguments(call);
         let outcome: Record<string, unknown> = { ok: false };
 
-        switch (call.function.name) {
+        switch (name) {
           case "save_address":
             outcome = await handleSaveAddress(callId, source, args);
             break;
@@ -355,8 +498,15 @@ export async function POST(req: NextRequest) {
           case "complete_lead":
             outcome = await handleCompleteLead(callId, source, metadata);
             break;
+          case "save_mi_casa_sms_lead":
+            outcome = await handleSaveSmsLead(
+              callId,
+              args,
+              customerPhone(m),
+            );
+            break;
           default:
-            outcome = { ok: false, error: `unknown tool ${call.function.name}` };
+            outcome = { ok: false, error: `unknown tool ${name ?? "missing"}` };
         }
 
         results.push({
