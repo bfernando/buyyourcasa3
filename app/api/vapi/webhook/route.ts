@@ -143,6 +143,14 @@ function str(v: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function phone(v: unknown): string | undefined {
+  const value = str(v);
+  if (!value || value.includes("{{") || value.includes("}}")) {
+    return undefined;
+  }
+  return value;
+}
+
 function bool(v: unknown): boolean {
   if (typeof v === "boolean") return v;
   if (typeof v !== "string") return false;
@@ -342,7 +350,7 @@ async function handleSaveSmsLead(
   const isTest = bool(args.isTest);
   const source = isTest ? "test-sms-vapi" : "sms-vapi";
   const address = str(args.address);
-  const phone = str(args.phone) ?? fallbackPhone;
+  const contactPhone = phone(fallbackPhone) ?? phone(args.phone);
   const firstName = str(args.firstName);
   const lastName = str(args.lastName);
   const email = str(args.email);
@@ -359,21 +367,21 @@ async function handleSaveSmsLead(
     source,
   });
   const hasDetails = Boolean(condition || timeline || reason);
-  const shouldComplete = !isTest && Boolean(phone);
+  const shouldComplete = !isTest && Boolean(contactPhone);
 
   const updatedLead = await prisma.lead.update({
     where: { id: existing.id },
     data: {
       address,
       source,
-      ...(phone && { phone }),
+      ...(contactPhone && { phone: contactPhone }),
       ...(firstName && { firstName }),
       ...(lastName && { lastName }),
       ...(email && { email }),
       ...(condition && { condition }),
       ...(timeline && { timeline }),
       ...(reason && { reason }),
-      step: hasDetails ? 3 : phone ? 2 : 1,
+      step: hasDetails ? 3 : contactPhone ? 2 : 1,
       ...(shouldComplete && { completed: true }),
     },
   });
