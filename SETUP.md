@@ -164,6 +164,7 @@ Required production variables:
 VAPI_PRIVATE_KEY=<private Vapi API key>
 VAPI_WEBHOOK_SECRET=<token stored in the Vapi webhook credential>
 NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID=<Vapi webhook credential ID>
+BEYFLO_VAPI_WEBHOOK_SECRET=<Beyflo webhook secret used when forwarding voice events>
 TWILIO_ACCOUNT_SID=<Twilio account SID>
 TWILIO_AUTH_TOKEN=<Twilio auth token>
 TWILIO_FROM_NUMBER=+16195470490

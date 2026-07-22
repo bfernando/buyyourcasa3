@@ -100,6 +100,21 @@ type EndOfCallMessage = {
   messages?: Array<{ role: string; message?: string; time?: number }>;
 };
 
+type ChatCreatedMessage = {
+  type: "chat.created";
+  timestamp?: string | number;
+  customer?: { number?: string };
+  phoneNumber?: { id?: string; number?: string };
+  assistant?: { id?: string; metadata?: Record<string, unknown> };
+  chat: {
+    id?: string;
+    sessionId?: string;
+    input?: unknown;
+    messages?: unknown;
+    metadata?: Record<string, unknown>;
+  };
+};
+
 // Loose envelope for "any Vapi message" — we narrow by `type` before use.
 type VapiMessage = { type?: string } & Record<string, unknown>;
 type SecretVerification =
@@ -116,6 +131,8 @@ type VapiRequestContext = {
   chatId?: string;
   sessionId?: string;
 };
+
+const BEYFLO_VAPI_WEBHOOK_URL = "https://www.beyflo.com/api/webhooks/vapi";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function verifySecret(req: NextRequest): SecretVerification {
@@ -371,6 +388,39 @@ async function resolveVapiSessionCustomerNumber(
       error,
     });
     return undefined;
+  }
+}
+
+async function forwardAssistantEventToBeyflo(
+  body: { message?: VapiMessage } | VapiMessage,
+): Promise<NextResponse> {
+  try {
+    const beyfloSecret = process.env.BEYFLO_VAPI_WEBHOOK_SECRET?.trim();
+    const response = await fetch(BEYFLO_VAPI_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(beyfloSecret && { "x-vapi-secret": beyfloSecret }),
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      console.error("[vapi webhook] Beyflo forwarding failed", {
+        status: response.status,
+      });
+      return NextResponse.json({
+        ok: true,
+        forwarded: false,
+        upstreamStatus: response.status,
+      });
+    }
+
+    return NextResponse.json(payload ?? { ok: true, forwarded: true });
+  } catch (error) {
+    console.error("[vapi webhook] Beyflo forwarding error", error);
+    return NextResponse.json({ ok: true, forwarded: false });
   }
 }
 
@@ -740,6 +790,40 @@ async function handleSaveSmsLead(
   };
 }
 
+async function handleChatCreated(message: ChatCreatedMessage) {
+  const chatId = str(message.chat.id);
+  const sessionId = str(message.chat.sessionId);
+  const conversationId = sessionId ?? chatId;
+  if (!chatId || !conversationId) {
+    return { ok: false, error: "missing chat or session id" };
+  }
+
+  const inboundMessage =
+    extractLatestUserMessage(message.chat.input) ??
+    extractLatestUserMessage(message.chat.messages);
+  const toolMessage: ToolCallsMessage = {
+    type: "tool-calls",
+    timestamp: message.timestamp,
+    customer: message.customer,
+    phoneNumber: message.phoneNumber,
+    chat: {
+      id: chatId,
+      sessionId,
+      metadata: message.chat.metadata,
+      customer: message.customer,
+    },
+  };
+
+  return handleSaveSmsLead(
+    conversationId,
+    `chat-created:${chatId}`,
+    "sms-vapi",
+    { inboundMessage },
+    toolMessage,
+    { chatId, sessionId },
+  );
+}
+
 // ─── End-of-call-report handler ───────────────────────────────────────────
 async function handleEndOfCall(msg: EndOfCallMessage) {
   const callId = msg.call?.id;
@@ -853,13 +937,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ results });
     }
 
-    if (type === "end-of-call-report") {
-      await handleEndOfCall(msg as unknown as EndOfCallMessage);
-      return NextResponse.json({ ok: true });
+    if (type === "chat.created") {
+      const outcome = await handleChatCreated(
+        msg as unknown as ChatCreatedMessage,
+      );
+      return NextResponse.json({ received: true, ...outcome });
     }
 
-    // Any other event type (status-update, hang, etc.) — ack and move on.
-    return NextResponse.json({ ok: true });
+    if (type === "end-of-call-report") {
+      await handleEndOfCall(msg as unknown as EndOfCallMessage);
+      return forwardAssistantEventToBeyflo(body);
+    }
+
+    // This assistant's legacy server URL points at Beyflo. Once chat.created
+    // events are routed here for deterministic SMS capture, preserve the
+    // existing voice/event behavior by forwarding everything else upstream.
+    return forwardAssistantEventToBeyflo(body);
   } catch (err) {
     console.error("[vapi webhook]", type, err);
     return NextResponse.json({ error: "handler failed" }, { status: 500 });
