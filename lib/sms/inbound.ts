@@ -127,6 +127,13 @@ export function notificationDispatchPlan(
   return { email, sms, acquisition: email || sms };
 }
 
+export function isExplicitSmsQaMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  return /\b(?:automated qa|automated quality assurance|production qa)\b/i.test(
+    message,
+  );
+}
+
 export function evaluateInboundSms({
   sender,
   message,

@@ -33,6 +33,7 @@ import {
 import {
   evaluateInboundSms,
   extractLatestUserMessage,
+  isExplicitSmsQaMessage,
   notificationDispatchPlan,
   notificationExcludedNumbers,
 } from "@/lib/sms/inbound";
@@ -818,7 +819,10 @@ async function handleChatCreated(message: ChatCreatedMessage) {
     conversationId,
     `chat-created:${chatId}`,
     "sms-vapi",
-    { inboundMessage },
+    {
+      inboundMessage,
+      isTest: isExplicitSmsQaMessage(inboundMessage),
+    },
     toolMessage,
     { chatId, sessionId },
   );

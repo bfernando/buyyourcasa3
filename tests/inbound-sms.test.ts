@@ -5,6 +5,7 @@ import {
   ADVERTISED_SMS_NUMBER,
   evaluateInboundSms,
   extractLatestUserMessage,
+  isExplicitSmsQaMessage,
   normalizePhoneNumber,
   notificationDispatchPlan,
   notificationExcludedNumbers,
@@ -32,6 +33,15 @@ test("extracts the exact latest customer message from Vapi chat input", () => {
     ]),
     "123 Main St, San Diego",
   );
+});
+
+test("only treats clearly labeled automated QA messages as tests", () => {
+  assert.equal(
+    isExplicitSmsQaMessage("Automated QA: verify the production SMS flow"),
+    true,
+  );
+  assert.equal(isExplicitSmsQaMessage("Production QA - seller intake"), true);
+  assert.equal(isExplicitSmsQaMessage("I want to test the market"), false);
 });
 
 test("accepts the first seller-intent SMS without requiring an address", () => {
