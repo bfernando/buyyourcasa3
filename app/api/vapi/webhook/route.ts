@@ -112,6 +112,11 @@ type SecretVerification =
       hasAuthorizationHeader: boolean;
     };
 
+type VapiRequestContext = {
+  chatId?: string;
+  sessionId?: string;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function verifySecret(req: NextRequest): SecretVerification {
   const expected = process.env.VAPI_WEBHOOK_SECRET;
@@ -191,10 +196,19 @@ function toolArguments(call: ToolCall): Record<string, unknown> {
 function interactionId(
   message: ToolCallsMessage,
   source: string,
+  requestContext: VapiRequestContext,
 ): string | undefined {
-  const isSms = source.includes("sms") || Boolean(message.chat || message.session);
+  const isSms =
+    source.includes("sms") ||
+    Boolean(
+      requestContext.sessionId ||
+        requestContext.chatId ||
+        message.chat ||
+        message.session,
+    );
   if (isSms) {
     const smsId =
+      requestContext.sessionId ??
       message.session?.id ??
       message.chat?.sessionId ??
       message.chat?.id ??
@@ -253,6 +267,7 @@ function smsAttribution(
   toolCallId: string,
   providerMessageId: string,
   sessionId: string,
+  requestContext: VapiRequestContext,
 ): Prisma.InputJsonObject {
   const metadata =
     message.session?.metadata ?? message.chat?.metadata ?? message.call?.metadata;
@@ -268,7 +283,7 @@ function smsAttribution(
     vapiToolCallId: toolCallId,
     vapiProviderMessageId: providerMessageId,
     vapiSessionId: sessionId,
-    vapiChatId: message.chat?.id,
+    vapiChatId: requestContext.chatId ?? message.chat?.id,
     vapiCallId: message.call?.id,
     vapiPhoneNumberId: message.phoneNumber?.id,
     transport: str(metadata?.transport),
@@ -279,9 +294,12 @@ function smsAttribution(
 async function resolveVapiChatContext(
   message: ToolCallsMessage,
   fallbackMessage: string | undefined,
+  requestContext: VapiRequestContext,
 ): Promise<{ sessionId?: string; inboundMessage?: string }> {
-  const knownSessionId = message.session?.id ?? message.chat?.sessionId;
-  if ((knownSessionId && fallbackMessage) || !message.chat?.id) {
+  const knownSessionId =
+    requestContext.sessionId ?? message.session?.id ?? message.chat?.sessionId;
+  const chatId = requestContext.chatId ?? message.chat?.id;
+  if ((knownSessionId && fallbackMessage) || !chatId) {
     return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
   }
 
@@ -292,13 +310,13 @@ async function resolveVapiChatContext(
 
   try {
     const response = await fetch(
-      `https://api.vapi.ai/chat/${encodeURIComponent(message.chat.id)}`,
+      `https://api.vapi.ai/chat/${encodeURIComponent(chatId)}`,
       { headers: { Authorization: `Bearer ${apiKey}` } },
     );
     if (!response.ok) {
       console.warn("[vapi webhook] chat context lookup failed", {
         status: response.status,
-        chatId: message.chat.id,
+        chatId,
       });
       return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
     }
@@ -317,10 +335,42 @@ async function resolveVapiChatContext(
     };
   } catch (error) {
     console.warn("[vapi webhook] chat context lookup error", {
-      chatId: message.chat.id,
+      chatId,
       error,
     });
     return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
+  }
+}
+
+async function resolveVapiSessionCustomerNumber(
+  sessionId: string | undefined,
+): Promise<string | undefined> {
+  const apiKey = process.env.VAPI_PRIVATE_KEY?.trim();
+  if (!apiKey || !sessionId) return undefined;
+
+  try {
+    const response = await fetch(
+      `https://api.vapi.ai/session/${encodeURIComponent(sessionId)}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
+    if (!response.ok) {
+      console.warn("[vapi webhook] session customer lookup failed", {
+        status: response.status,
+        sessionId,
+      });
+      return undefined;
+    }
+
+    const session = (await response.json()) as {
+      customer?: { number?: unknown };
+    };
+    return phone(session.customer?.number);
+  } catch (error) {
+    console.warn("[vapi webhook] session customer lookup error", {
+      sessionId,
+      error,
+    });
+    return undefined;
   }
 }
 
@@ -476,6 +526,7 @@ async function handleSaveSmsLead(
   sourceFromMessage: string,
   args: Record<string, unknown>,
   message: ToolCallsMessage,
+  requestContext: VapiRequestContext,
 ) {
   const isTest = bool(args.isTest);
   const source =
@@ -483,16 +534,21 @@ async function handleSaveSmsLead(
       ? "test-sms-vapi"
       : "sms-vapi";
   const address = str(args.address);
-  const contactPhone = phone(customerPhone(message)) ?? phone(args.phone);
   const fallbackInboundMessage =
     str(args.inboundMessage) ?? str(args.message) ?? address;
   const chatContext = await resolveVapiChatContext(
     message,
     fallbackInboundMessage,
+    requestContext,
   );
+  const contactPhone =
+    phone(customerPhone(message)) ??
+    (await resolveVapiSessionCustomerNumber(chatContext.sessionId)) ??
+    phone(args.phone);
   const inboundMessage = chatContext.inboundMessage;
   const resolvedConversationId = chatContext.sessionId ?? conversationId;
-  const providerMessageId = message.chat?.id ?? toolCallId;
+  const providerMessageId =
+    requestContext.chatId ?? message.chat?.id ?? toolCallId;
   const firstName = str(args.firstName);
   const lastName = str(args.lastName);
   const email = str(args.email);
@@ -528,6 +584,7 @@ async function handleSaveSmsLead(
     toolCallId,
     providerMessageId,
     resolvedConversationId,
+    requestContext,
   );
   const hasDetails = Boolean(condition || timeline || reason);
   const shouldComplete =
@@ -738,7 +795,11 @@ export async function POST(req: NextRequest) {
     if (type === "tool-calls") {
       const m = msg as unknown as ToolCallsMessage;
       const source = interactionSource(m);
-      const callId = interactionId(m, source);
+      const requestContext: VapiRequestContext = {
+        chatId: str(req.headers.get("x-chat-id")),
+        sessionId: str(req.headers.get("x-session-id")),
+      };
+      const callId = interactionId(m, source, requestContext);
       if (!callId) {
         return NextResponse.json(
           { error: "missing interaction id" },
@@ -776,6 +837,7 @@ export async function POST(req: NextRequest) {
               source,
               args,
               m,
+              requestContext,
             );
             break;
           default:
