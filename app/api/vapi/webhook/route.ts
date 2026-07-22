@@ -1,11 +1,12 @@
 /**
  * app/api/vapi/webhook/route.ts
  * ─────────────────────────────
- * Receives server-side events from Vapi during a browser voice call.
+ * Receives server-side events from Vapi for browser voice calls and inbound
+ * SMS sessions.
  *
  * Two kinds of events we care about:
  *   1. tool-calls       — assistant called one of our function tools
- *                         (save_address, save_contact, save_details, complete_lead).
+ *                         (including save_mi_casa_sms_lead).
  *                         We write the extracted fields into the leads table,
  *                         same rows the legacy form writes to.
  *   2. end-of-call-report — the call ended. We save the transcript, recording
@@ -19,9 +20,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Lead, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendLeadCompletionAlert } from "@/lib/email/lead-alert";
-import { sendLeadCompletionSmsAlert } from "@/lib/sms/lead-alert";
+import {
+  sendInboundSmsLeadAlert,
+  sendLeadCompletionAlert,
+} from "@/lib/email/lead-alert";
+import {
+  sendInboundSmsLeadSmsAlert,
+  sendLeadCompletionSmsAlert,
+} from "@/lib/sms/lead-alert";
+import {
+  evaluateInboundSms,
+  extractLatestUserMessage,
+  notificationDispatchPlan,
+  notificationExcludedNumbers,
+} from "@/lib/sms/inbound";
 import { notifyPropertyAcquisitionEngine } from "@/lib/property-acquisition";
 import {
   createServerMetaEventId,
@@ -50,13 +64,20 @@ type ToolCallsMessage = {
     metadata?: Record<string, unknown>;
     customer?: { number?: string };
   };
-  chat?: { id?: string; customer?: { number?: string } };
+  chat?: {
+    id?: string;
+    sessionId?: string;
+    metadata?: Record<string, unknown>;
+    customer?: { number?: string };
+  };
   session?: {
     id?: string;
     metadata?: Record<string, unknown>;
     customer?: { number?: string };
   };
+  phoneNumber?: { id?: string; number?: string };
   customer?: { number?: string };
+  timestamp?: string | number;
   toolCallList?: ToolCall[];
   toolCalls?: ToolCall[];
 };
@@ -167,9 +188,21 @@ function toolArguments(call: ToolCall): Record<string, unknown> {
   );
 }
 
-function interactionId(message: ToolCallsMessage): string | undefined {
-  const directId = message.call?.id ?? message.chat?.id ?? message.session?.id;
-  if (directId) return directId;
+function interactionId(
+  message: ToolCallsMessage,
+  source: string,
+): string | undefined {
+  const isSms = source.includes("sms") || Boolean(message.chat || message.session);
+  if (isSms) {
+    const smsId =
+      message.session?.id ??
+      message.chat?.sessionId ??
+      message.chat?.id ??
+      message.call?.id;
+    if (smsId) return smsId;
+  }
+
+  if (message.call?.id) return message.call.id;
 
   const phone = customerPhone(message);
   return phone ? `sms:${phone}` : undefined;
@@ -185,13 +218,110 @@ function customerPhone(message: ToolCallsMessage): string | undefined {
 }
 
 function interactionSource(message: ToolCallsMessage): string {
-  const metadata = message.call?.metadata ?? message.session?.metadata;
+  const metadata =
+    message.call?.metadata ?? message.session?.metadata ?? message.chat?.metadata;
   const configuredSource = str(metadata?.source);
   if (configuredSource) return configuredSource;
 
   return message.chat || message.session || message.call?.type === "chat"
     ? "sms-vapi"
     : "voice-en";
+}
+
+function inboundTimestamp(message: ToolCallsMessage): Date {
+  const value = message.timestamp;
+  const parsed =
+    typeof value === "number"
+      ? new Date(value < 10_000_000_000 ? value * 1000 : value)
+      : typeof value === "string"
+        ? new Date(value)
+        : new Date();
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function compactObject(
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== undefined),
+  );
+}
+
+function smsAttribution(
+  message: ToolCallsMessage,
+  source: string,
+  toolCallId: string,
+  providerMessageId: string,
+  sessionId: string,
+): Prisma.InputJsonObject {
+  const metadata =
+    message.session?.metadata ?? message.chat?.metadata ?? message.call?.metadata;
+  const propertyAttribution =
+    metadata?.propertyAcquisitionAttribution &&
+    typeof metadata.propertyAcquisitionAttribution === "object"
+      ? metadata.propertyAcquisitionAttribution
+      : undefined;
+
+  return compactObject({
+    provider: "vapi",
+    source,
+    vapiToolCallId: toolCallId,
+    vapiProviderMessageId: providerMessageId,
+    vapiSessionId: sessionId,
+    vapiChatId: message.chat?.id,
+    vapiCallId: message.call?.id,
+    vapiPhoneNumberId: message.phoneNumber?.id,
+    transport: str(metadata?.transport),
+    propertyAcquisitionAttribution: propertyAttribution,
+  }) as Prisma.InputJsonObject;
+}
+
+async function resolveVapiChatContext(
+  message: ToolCallsMessage,
+  fallbackMessage: string | undefined,
+): Promise<{ sessionId?: string; inboundMessage?: string }> {
+  const knownSessionId = message.session?.id ?? message.chat?.sessionId;
+  if ((knownSessionId && fallbackMessage) || !message.chat?.id) {
+    return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
+  }
+
+  const apiKey = process.env.VAPI_PRIVATE_KEY?.trim();
+  if (!apiKey) {
+    return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.vapi.ai/chat/${encodeURIComponent(message.chat.id)}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
+    if (!response.ok) {
+      console.warn("[vapi webhook] chat context lookup failed", {
+        status: response.status,
+        chatId: message.chat.id,
+      });
+      return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
+    }
+
+    const chat = (await response.json()) as {
+      sessionId?: string;
+      input?: unknown;
+      messages?: unknown;
+    };
+    return {
+      sessionId: knownSessionId ?? str(chat.sessionId),
+      inboundMessage:
+        fallbackMessage ??
+        extractLatestUserMessage(chat.input) ??
+        extractLatestUserMessage(chat.messages),
+    };
+  } catch (error) {
+    console.warn("[vapi webhook] chat context lookup error", {
+      chatId: message.chat.id,
+      error,
+    });
+    return { sessionId: knownSessionId, inboundMessage: fallbackMessage };
+  }
 }
 
 // ─── Tool-call handlers ───────────────────────────────────────────────────
@@ -204,12 +334,10 @@ async function findOrCreateByCallId(
   callId: string,
   initial: { address: string; source: string },
 ) {
-  // Upsert by a unique (callId)? We don't have a unique constraint on callId,
-  // so do a findFirst then create-or-update.
-  const existing = await prisma.lead.findFirst({ where: { callId } });
-  if (existing) return existing;
-  return prisma.lead.create({
-    data: {
+  return prisma.lead.upsert({
+    where: { callId },
+    update: {},
+    create: {
       address: initial.address,
       source: initial.source,
       callId,
@@ -344,13 +472,27 @@ async function handleCompleteLead(
 
 async function handleSaveSmsLead(
   conversationId: string,
+  toolCallId: string,
+  sourceFromMessage: string,
   args: Record<string, unknown>,
-  fallbackPhone?: string,
+  message: ToolCallsMessage,
 ) {
   const isTest = bool(args.isTest);
-  const source = isTest ? "test-sms-vapi" : "sms-vapi";
+  const source =
+    isTest || sourceFromMessage.startsWith("test-")
+      ? "test-sms-vapi"
+      : "sms-vapi";
   const address = str(args.address);
-  const contactPhone = phone(fallbackPhone) ?? phone(args.phone);
+  const contactPhone = phone(customerPhone(message)) ?? phone(args.phone);
+  const fallbackInboundMessage =
+    str(args.inboundMessage) ?? str(args.message) ?? address;
+  const chatContext = await resolveVapiChatContext(
+    message,
+    fallbackInboundMessage,
+  );
+  const inboundMessage = chatContext.inboundMessage;
+  const resolvedConversationId = chatContext.sessionId ?? conversationId;
+  const providerMessageId = message.chat?.id ?? toolCallId;
   const firstName = str(args.firstName);
   const lastName = str(args.lastName);
   const email = str(args.email);
@@ -358,57 +500,172 @@ async function handleSaveSmsLead(
   const timeline = str(args.timeline);
   const reason = str(args.reason);
 
-  if (!address) {
-    return { ok: false, error: "address missing" };
-  }
-
-  const existing = await findOrCreateByCallId(conversationId, {
+  const decision = evaluateInboundSms({
+    sender: contactPhone,
+    message: inboundMessage,
     address,
     source,
+    isTest,
+    excludedNumbers: notificationExcludedNumbers(
+      process.env.TWILIO_FROM_NUMBER,
+      process.env.NOTIFICATION_PHONE_NUMBERS,
+    ),
   });
+
+  if (!decision.shouldPersist || !decision.normalizedSender) {
+    return {
+      ok: true,
+      ignored: true,
+      reason: decision.reason,
+      test: decision.kind === "test",
+    };
+  }
+
+  const receivedAt = inboundTimestamp(message);
+  const attribution = smsAttribution(
+    message,
+    source,
+    toolCallId,
+    providerMessageId,
+    resolvedConversationId,
+  );
   const hasDetails = Boolean(condition || timeline || reason);
-  const shouldComplete = !isTest && Boolean(contactPhone);
+  const shouldComplete =
+    decision.kind === "prospect" && Boolean(address && decision.normalizedSender);
+  const placeholderAddress = "(pending SMS address)";
 
-  const updatedLead = await prisma.lead.update({
-    where: { id: existing.id },
-    data: {
-      address,
-      source,
-      ...(contactPhone && { phone: contactPhone }),
-      ...(firstName && { firstName }),
-      ...(lastName && { lastName }),
-      ...(email && { email }),
-      ...(condition && { condition }),
-      ...(timeline && { timeline }),
-      ...(reason && { reason }),
-      step: hasDetails ? 3 : contactPhone ? 2 : 1,
-      ...(shouldComplete && { completed: true }),
-    },
-  });
+  let updatedLead: Lead;
+  try {
+    updatedLead = await prisma.lead.upsert({
+      where: { callId: resolvedConversationId },
+      create: {
+        address: address ?? placeholderAddress,
+        source,
+        channel: "SMS",
+        phone: decision.normalizedSender,
+        callId: resolvedConversationId,
+        smsProvider: "vapi",
+        providerMessageId,
+        inboundMessage: decision.normalizedMessage ?? address,
+        firstInboundAt: receivedAt,
+        lastInboundAt: receivedAt,
+        attribution,
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(email && { email }),
+        ...(condition && { condition }),
+        ...(timeline && { timeline }),
+        ...(reason && { reason }),
+        step: hasDetails ? 3 : address ? 2 : 1,
+        ...(decision.kind === "opt_out" && { smsOptedOutAt: receivedAt }),
+      },
+      update: {
+        ...(address && { address }),
+        source,
+        channel: "SMS",
+        phone: decision.normalizedSender,
+        smsProvider: "vapi",
+        providerMessageId,
+        ...(decision.normalizedMessage && {
+          inboundMessage: decision.normalizedMessage,
+        }),
+        lastInboundAt: receivedAt,
+        attribution,
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(email && { email }),
+        ...(condition && { condition }),
+        ...(timeline && { timeline }),
+        ...(reason && { reason }),
+        step: hasDetails ? 3 : address ? 2 : 1,
+        ...(decision.kind === "opt_out" && { smsOptedOutAt: receivedAt }),
+        ...(decision.kind === "opt_in" && { smsOptedOutAt: null }),
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const duplicate = await prisma.lead.findUnique({
+        where: { providerMessageId },
+      });
+      if (duplicate) {
+        return {
+          ok: true,
+          leadId: duplicate.id,
+          completed: duplicate.completed,
+          duplicate: true,
+          test: source === "test-sms-vapi",
+        };
+      }
+    }
+    throw error;
+  }
 
-  if (!existing.completed && updatedLead.completed) {
+  const completionClaim = shouldComplete
+    ? await prisma.lead.updateMany({
+        where: { id: updatedLead.id, completed: false },
+        data: { completed: true, step: 4 },
+      })
+    : { count: 0 };
+
+  const alertEligible = decision.shouldAlert && !updatedLead.smsOptedOutAt;
+  const [emailClaim, smsClaim] = alertEligible
+    ? await prisma.$transaction([
+        prisma.lead.updateMany({
+          where: { id: updatedLead.id, smsEmailAlertClaimedAt: null },
+          data: { smsEmailAlertClaimedAt: receivedAt },
+        }),
+        prisma.lead.updateMany({
+          where: { id: updatedLead.id, smsInternalAlertClaimedAt: null },
+          data: { smsInternalAlertClaimedAt: receivedAt },
+        }),
+      ])
+    : [{ count: 0 }, { count: 0 }];
+
+  updatedLead =
+    (await prisma.lead.findUnique({ where: { id: updatedLead.id } })) ??
+    updatedLead;
+
+  const dispatch = notificationDispatchPlan(emailClaim.count, smsClaim.count);
+  const firstMessageEffects: Array<Promise<unknown>> = [];
+  if (dispatch.email) {
+    firstMessageEffects.push(sendInboundSmsLeadAlert(updatedLead));
+  }
+  if (dispatch.sms) {
+    firstMessageEffects.push(sendInboundSmsLeadSmsAlert(updatedLead));
+  }
+  if (dispatch.acquisition) {
+    firstMessageEffects.push(
+      notifyPropertyAcquisitionEngine({
+        eventType: "funnel_sms_started",
+        lead: updatedLead,
+        attribution: attribution as Record<string, unknown>,
+      }),
+    );
+  }
+
+  if (completionClaim.count === 1) {
     const metaEventId = createServerMetaEventId("lead_sms", updatedLead.id);
-    const results = await Promise.allSettled([
-      sendLeadCompletionAlert(updatedLead),
-      sendLeadCompletionSmsAlert(updatedLead),
+    firstMessageEffects.push(
       notifyPropertyAcquisitionEngine({
         eventType: "funnel_sms_completed",
         lead: updatedLead,
+        attribution: attribution as Record<string, unknown>,
       }),
       sendMetaLeadEvent({
         lead: updatedLead,
         eventId: metaEventId,
         browser: {},
       }),
-    ]);
+    );
+  }
 
-    for (const result of results) {
-      if (result.status === "rejected") {
-        console.error(
-          "[vapi webhook] SMS lead completion side effect failed",
-          result.reason,
-        );
-      }
+  const effects = await Promise.allSettled(firstMessageEffects);
+  for (const effect of effects) {
+    if (effect.status === "rejected") {
+      console.error("[vapi webhook] SMS lead side effect failed", effect.reason);
     }
   }
 
@@ -416,7 +673,13 @@ async function handleSaveSmsLead(
     ok: true,
     leadId: updatedLead.id,
     completed: updatedLead.completed,
-    test: isTest,
+    test: decision.kind === "test",
+    kind: decision.kind,
+    notificationClaimed: dispatch.acquisition,
+    ...(decision.replyInstruction && {
+      replyInstruction: decision.replyInstruction,
+    }),
+    ...(decision.kind === "opt_out" && { suppressReply: true }),
   };
 }
 
@@ -474,7 +737,8 @@ export async function POST(req: NextRequest) {
   try {
     if (type === "tool-calls") {
       const m = msg as unknown as ToolCallsMessage;
-      const callId = interactionId(m);
+      const source = interactionSource(m);
+      const callId = interactionId(m, source);
       if (!callId) {
         return NextResponse.json(
           { error: "missing interaction id" },
@@ -482,7 +746,6 @@ export async function POST(req: NextRequest) {
         );
       }
       const metadata = m.call?.metadata;
-      const source = interactionSource(m);
       const calls = m.toolCallList ?? m.toolCalls ?? [];
 
       // Vapi expects a `results` array keyed by the tool-call id.
@@ -509,8 +772,10 @@ export async function POST(req: NextRequest) {
           case "save_mi_casa_sms_lead":
             outcome = await handleSaveSmsLead(
               callId,
+              call.id,
+              source,
               args,
-              customerPhone(m),
+              m,
             );
             break;
           default:

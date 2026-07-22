@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "test:sms-inbound": "node --test tests/inbound-sms.test.ts",
     "check:facebook-funnel": "playwright test tests/facebook-in-app-funnel.spec.ts --project=chromium",
     "postinstall": "prisma generate"
   },

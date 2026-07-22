@@ -107,11 +107,56 @@ The Mi Casa Twilio number can use Vapi SMS Chat for customer-initiated text
 conversations. The number must be SMS-capable, 10DLC approved, imported into
 Vapi with SMS enabled, and attached to the Mi Casa assistant.
 
-The assistant uses the `save_mi_casa_sms_lead` function tool after a seller
-provides a property address. The tool posts to `/api/vapi/webhook`, stores the
-sender as an `sms-vapi` lead, and triggers the normal email, internal SMS, Meta
-CAPI, and acquisition-engine completion notifications. Automated QA calls must
-set `isTest=true`; those rows use `test-sms-vapi` and do not send notifications.
+The assistant uses the `save_mi_casa_sms_lead` function tool on the first
+seller-intent text, before requiring a property address. The tool posts to
+`/api/vapi/webhook`, trusts the server-side Vapi customer number, and stores one
+lead per Vapi session with `source=sms-vapi`, `channel=SMS`, the inbound text,
+Vapi Chat ID, first/last inbound timestamps, and available attribution. The
+Vapi Chat ID is the immutable provider message ID exposed to this webhook (with
+the tool-call ID as a fallback); Vapi does not forward the original Twilio
+`MessageSid` in tool calls.
+
+The first valid external sender atomically claims one email alert and one
+internal SMS alert even when the lead remains `completed=false`. A later tool
+call can add the property address and complete the lead without repeating those
+owner/team alerts. Automated QA calls must set `isTest=true`; those rows use
+`test-sms-vapi` and do not send notifications. The advertised number,
+`TWILIO_FROM_NUMBER`, and every `NOTIFICATION_PHONE_NUMBERS` recipient are
+server-side exclusions so owner/team/system traffic cannot create alerts.
+
+Before deploying this code, apply the additive database SQL once against the
+production database:
+
+```bash
+npx prisma db execute \
+  --file prisma/manual-migrations/20260722_inbound_sms_first_message.sql \
+  --schema prisma/schema.prisma
+```
+
+This repository has no baseline Prisma migration history, so do not replace
+that command with `prisma migrate deploy` until the existing database has been
+properly baselined.
+
+After the database and application deploy are ready, update the Vapi tool and
+assistant together:
+
+- Fetch the complete `save_mi_casa_sms_lead` tool definition, change its
+  description to call immediately on the first seller-intent SMS, add required
+  `inboundMessage` (the exact current customer text), and make `address`
+  optional.
+- PATCH the complete tool definition. Preserve its existing `server.url` and
+  `server.credentialId`; a partial tool PATCH can clear the server URL.
+- Update the assistant SMS instructions to call the tool before replying to the
+  first seller-intent text and follow the returned `replyInstruction` for a
+  concise acknowledgment. Remove instructions that pass literal
+  `{{customer.number}}`; the webhook resolves the sender from trusted Vapi
+  metadata and rejects unresolved templates.
+- Do not call the tool for owner/team numbers, provider/system traffic, spam,
+  vendors, or unrelated inquiries. STOP/UNSUBSCRIBE/CANCEL/END/QUIT must end the
+  sales conversation; HELP gets one concise help response. Twilio remains the
+  carrier-level opt-out enforcement layer.
+- Keep the tool response contract exactly
+  `{ "results": [{ "toolCallId": "...", "result": "..." }] }`.
 
 Required production variables:
 
@@ -119,6 +164,13 @@ Required production variables:
 VAPI_PRIVATE_KEY=<private Vapi API key>
 VAPI_WEBHOOK_SECRET=<token stored in the Vapi webhook credential>
 NEXT_PUBLIC_VAPI_WEBHOOK_CREDENTIAL_ID=<Vapi webhook credential ID>
+TWILIO_ACCOUNT_SID=<Twilio account SID>
+TWILIO_AUTH_TOKEN=<Twilio auth token>
+TWILIO_FROM_NUMBER=+16195470490
+NOTIFICATION_PHONE_NUMBERS=<comma-separated owner/team mobile numbers>
+RESEND_API_KEY=<Resend API key>
+LEAD_ALERT_TO=<comma-separated owner/team email addresses>
+LEAD_ALERT_FROM=Mi Casa Investments <hello@buyyour.casa>
 ```
 
 Keep SMS responses concise and modality-aware. The shared assistant should say
@@ -174,7 +226,10 @@ LEAD_ALERT_TO=<your-inbox@example.com>
 LEAD_ALERT_FROM=Mi Casa Investments <hello@buyyour.casa>
 ```
 
-The app sends one internal alert when a lead transitions to `completed=true`, across both the form and voice funnels.
+The app sends one internal alert when a form or voice lead transitions to
+`completed=true`. Inbound SMS is intentionally earlier: it alerts once after
+the first valid seller text/number, whether or not the scripted SMS intake is
+later completed.
 
 ### Private Lead Review Endpoint
 

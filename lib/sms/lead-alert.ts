@@ -41,6 +41,22 @@ function buildSmsBody(lead: Lead): string {
   ].join("\n");
 }
 
+function buildInboundSmsBody(lead: Lead): string {
+  const name = [lead.firstName, lead.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+  const message = lead.inboundMessage?.trim();
+
+  return [
+    "New Mi Casa inbound SMS lead",
+    `Phone: ${valueOrFallback(lead.phone)}`,
+    `Name: ${valueOrFallback(name)}`,
+    `Address: ${valueOrFallback(lead.address)}`,
+    `Message: ${valueOrFallback(message ? message.slice(0, 320) : undefined)}`,
+  ].join("\n");
+}
+
 async function sendTwilioMessage(to: string, body: string): Promise<string> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
@@ -111,6 +127,40 @@ export async function sendLeadCompletionSmsAlert(
     return { ok: true, ids };
   } catch (error) {
     console.error("[lead-sms-alert] send failed", {
+      leadId: lead.id,
+      error,
+    });
+    return { ok: false, reason: "send_failed" };
+  }
+}
+
+export async function sendInboundSmsLeadSmsAlert(
+  lead: Lead,
+): Promise<SmsAlertResult> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const from = process.env.TWILIO_FROM_NUMBER?.trim();
+  const to = notificationNumbers();
+
+  if (!accountSid || !authToken || !from || to.length === 0) {
+    console.warn("[lead-sms-alert] missing inbound SMS alert configuration", {
+      leadId: lead.id,
+      hasAccountSid: Boolean(accountSid),
+      hasAuthToken: Boolean(authToken),
+      hasFrom: Boolean(from),
+      recipientCount: to.length,
+    });
+    return { ok: false, skipped: true, reason: "missing_config" };
+  }
+
+  try {
+    const body = buildInboundSmsBody(lead);
+    const ids = await Promise.all(
+      to.map((number) => sendTwilioMessage(number, body)),
+    );
+    return { ok: true, ids };
+  } catch (error) {
+    console.error("[lead-sms-alert] inbound alert send failed", {
       leadId: lead.id,
       error,
     });

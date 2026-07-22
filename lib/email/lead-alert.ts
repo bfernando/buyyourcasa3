@@ -4,6 +4,7 @@ import { Resend } from "resend";
 type LeadAlertResult =
   | { ok: true; id?: string | null }
   | { ok: false; skipped?: boolean; reason: string };
+type LeadAlertStage = "completed" | "inbound_sms";
 
 const NOT_PROVIDED = "Not provided";
 const ADDITIONAL_LEAD_ALERT_RECIPIENTS = ["nickdias1@gmail.com"];
@@ -54,7 +55,25 @@ function detailRow(label: string, value: string): string {
   `;
 }
 
-function buildHtmlBody(lead: Lead): string {
+function stageCopy(stage: LeadAlertStage) {
+  return stage === "inbound_sms"
+    ? {
+        heading: "New Inbound SMS Lead",
+        intro:
+          "A seller texted the advertised number. The lead was captured immediately, even if the intake is not complete.",
+        subjectPrefix: "New inbound SMS lead",
+        timestampLabel: "First Inbound At",
+      }
+    : {
+        heading: "New Completed Lead",
+        intro: "A lead completed the funnel and is ready for follow-up.",
+        subjectPrefix: "New completed lead",
+        timestampLabel: "Completed At",
+      };
+}
+
+function buildHtmlBody(lead: Lead, stage: LeadAlertStage): string {
+  const copy = stageCopy(stage);
   const rows = [
     ["Lead ID", lead.id],
     ["Source", valueOrFallback(lead.source)],
@@ -67,8 +86,17 @@ function buildHtmlBody(lead: Lead): string {
     ["Timeline", valueOrFallback(lead.timeline)],
     ["Reason", valueOrFallback(lead.reason)],
     ["Created At", formatTimestamp(lead.createdAt)],
-    ["Completed At", formatTimestamp(lead.updatedAt)],
+    [
+      copy.timestampLabel,
+      formatTimestamp(lead.firstInboundAt ?? lead.updatedAt),
+    ],
   ];
+
+  if (lead.channel) rows.push(["Channel", lead.channel]);
+  if (lead.inboundMessage) rows.push(["Inbound Message", lead.inboundMessage]);
+  if (lead.providerMessageId) {
+    rows.push(["Provider Message ID", lead.providerMessageId]);
+  }
 
   if (lead.callId) {
     rows.push(["Call ID", lead.callId]);
@@ -86,11 +114,11 @@ function buildHtmlBody(lead: Lead): string {
     <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
       <div style="padding:20px 24px;background:#111827;color:#f9fafb;">
         <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#d1d5db;">Mi Casa Investment Group</p>
-        <h1 style="margin:0;font-size:24px;line-height:1.2;">New Completed Lead</h1>
+        <h1 style="margin:0;font-size:24px;line-height:1.2;">${copy.heading}</h1>
       </div>
       <div style="padding:24px;">
         <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">
-          A lead completed the funnel and is ready for follow-up.
+          ${copy.intro}
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5;">
           ${rows.map(([label, value]) => detailRow(label, value)).join("")}
@@ -101,9 +129,10 @@ function buildHtmlBody(lead: Lead): string {
 </html>`;
 }
 
-function buildTextBody(lead: Lead): string {
+function buildTextBody(lead: Lead, stage: LeadAlertStage): string {
+  const copy = stageCopy(stage);
   const lines = [
-    "New completed lead",
+    copy.heading,
     "",
     `Lead ID: ${valueOrFallback(lead.id)}`,
     `Source: ${valueOrFallback(lead.source)}`,
@@ -116,8 +145,14 @@ function buildTextBody(lead: Lead): string {
     `Timeline: ${valueOrFallback(lead.timeline)}`,
     `Reason: ${valueOrFallback(lead.reason)}`,
     `Created At: ${formatTimestamp(lead.createdAt)}`,
-    `Completed At: ${formatTimestamp(lead.updatedAt)}`,
+    `${copy.timestampLabel}: ${formatTimestamp(lead.firstInboundAt ?? lead.updatedAt)}`,
   ];
+
+  if (lead.channel) lines.push(`Channel: ${lead.channel}`);
+  if (lead.inboundMessage) lines.push(`Inbound Message: ${lead.inboundMessage}`);
+  if (lead.providerMessageId) {
+    lines.push(`Provider Message ID: ${lead.providerMessageId}`);
+  }
 
   if (lead.callId) {
     lines.push(`Call ID: ${lead.callId}`);
@@ -132,8 +167,9 @@ function buildTextBody(lead: Lead): string {
   return lines.join("\n");
 }
 
-export async function sendLeadCompletionAlert(
+async function sendLeadAlert(
   lead: Lead,
+  stage: LeadAlertStage,
 ): Promise<LeadAlertResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const to = leadAlertRecipients();
@@ -151,18 +187,21 @@ export async function sendLeadCompletionAlert(
 
   try {
     const resend = new Resend(apiKey);
-    const subject = `New completed lead: ${valueOrFallback(lead.address)}`;
+    const copy = stageCopy(stage);
+    const subject = `${copy.subjectPrefix}: ${valueOrFallback(
+      stage === "inbound_sms" ? lead.phone : lead.address,
+    )}`;
     const { data, error } = await resend.emails.send(
       {
         from,
         to,
         subject,
-        html: buildHtmlBody(lead),
-        text: buildTextBody(lead),
+        html: buildHtmlBody(lead, stage),
+        text: buildTextBody(lead, stage),
       },
       {
         headers: {
-          "Idempotency-Key": `lead-completion-${lead.id}`,
+          "Idempotency-Key": `lead-${stage}-${lead.id}`,
         },
       },
     );
@@ -183,4 +222,16 @@ export async function sendLeadCompletionAlert(
     });
     return { ok: false, reason: "send_failed" };
   }
+}
+
+export async function sendLeadCompletionAlert(
+  lead: Lead,
+): Promise<LeadAlertResult> {
+  return sendLeadAlert(lead, "completed");
+}
+
+export async function sendInboundSmsLeadAlert(
+  lead: Lead,
+): Promise<LeadAlertResult> {
+  return sendLeadAlert(lead, "inbound_sms");
 }

@@ -14,9 +14,10 @@ model Lead {
 
   // Step 1 — captured immediately on first action
   address   String
-  source    String   @default("desktop") // "desktop" | "mobile" | "voice-en" | "voice-es"
-  step      Int      @default(1)         // highest step reached
-  completed Boolean  @default(false)
+  source    String  @default("desktop") // "desktop" | "mobile" | "voice-en" | "voice-es" | "sms-vapi"
+  channel   String?
+  step      Int     @default(1) // highest step reached
+  completed Boolean @default(false)
 
   // Step 2 — contact info
   phone     String?
@@ -31,10 +32,23 @@ model Lead {
 
   // Voice agent (Vapi) call artifacts — nullable; only populated when the
   // lead originated from the browser voice agent (source starts with "voice-").
-  callId          String?
+  callId          String? @unique
   callDurationSec Int?
   recordingUrl    String?
   transcript      Json?
+
+  // Inbound SMS. The provider message ID is the Vapi Chat ID (or immutable
+  // tool-call ID fallback), which is stable across webhook retries. The first
+  // valid SMS creates the lead even when the seller never finishes intake.
+  smsProvider               String?
+  providerMessageId         String?   @unique
+  inboundMessage            String?
+  firstInboundAt            DateTime?
+  lastInboundAt             DateTime?
+  smsOptedOutAt             DateTime?
+  smsEmailAlertClaimedAt    DateTime?
+  smsInternalAlertClaimedAt DateTime?
+  attribution               Json?
 
   @@map("leads")
 }
